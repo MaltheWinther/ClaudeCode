@@ -52,92 +52,42 @@
   <div id="wrap">
     <canvas id="c" width="600" height="500"></canvas>
     <div id="win-screen">
-      <div id="win-msg">Level complete!</div>
-      <button id="win-btn" onclick="winAction()">Next Level</button>
+      <div>You reached the goal!</div>
+      <button onclick="resetGame()">Play Again</button>
     </div>
   </div>
   <div id="status">Connecting to gyro...</div>
 
 <script>
-// ── Level Data ─────────────────────────────────────────────────────────────────
-const LEVELS = [
-  // ── Level 1 — 3 corridors, goal bottom-right ──
-  {
-    walls: [
-      // Border
-      {x:0,   y:0,   w:600, h:15},
-      {x:0,   y:485, w:600, h:15},
-      {x:0,   y:0,   w:15,  h:500},
-      {x:585, y:0,   w:15,  h:500},
-      // Divider 1 — gap on RIGHT (x=415–585)
-      {x:15,  y:165, w:400, h:15},
-      // Divider 2 — gap on LEFT (x=15–200)
-      {x:200, y:330, w:385, h:15},
-      // Extra wall in top corridor
-      {x:180, y:80,  w:160, h:15},
-      // Dead-end wall in middle corridor
-      {x:360, y:220, w:15,  h:110},
-    ],
-    holes: [
-      {x:280, y:122, r:18},   // top — below the extra wall
-      {x:470, y:255, r:18},   // middle — dead end
-      {x:100, y:410, r:18},   // bottom — wrong direction
-    ],
-    goal:  {x:545, y:435, r:25},
-    start: {x:45,  y:85},
-  },
-
-  // ── Level 2 — 4 corridors, goal bottom-left, smaller goal, 4 holes ──
-  //
-  // Path: start top-left → RIGHT gap → LEFT gap → RIGHT gap → goal bottom-left
-  //
-  // C1 (y=15–121):  horizontal wall at y=80 forces ball to go above it;
-  //                  hole below the wall punishes sneaking under.
-  // C2 (y=136–242): vertical dead-end on far right (hole inside);
-  //                  left horizontal blocker forces careful navigation.
-  // C3 (y=257–363): horizontal block forces ball to stay high;
-  //                  hole below block punishes dropping too soon.
-  // C4 (y=378–485): horizontal shelf in center; goal is far LEFT,
-  //                  ball enters from RIGHT — must cross above the shelf.
-  {
-    walls: [
-      // Border
-      {x:0,   y:0,   w:600, h:15},
-      {x:0,   y:485, w:600, h:15},
-      {x:0,   y:0,   w:15,  h:500},
-      {x:585, y:0,   w:15,  h:500},
-      // Divider 1 — gap on RIGHT (x=420–585)
-      {x:15,  y:121, w:405, h:15},
-      // Divider 2 — gap on LEFT (x=15–170)
-      {x:170, y:242, w:415, h:15},
-      // Divider 3 — gap on RIGHT (x=420–585)
-      {x:15,  y:363, w:405, h:15},
-      // C1: horizontal wall (ball must go above)
-      {x:200, y:80,  w:180, h:15},
-      // C2: horizontal blocker — starts at x=80 so left corridor stays open for the gap
-      {x:80,  y:196, w:200, h:15},
-      // C3: horizontal block (ball must stay high)
-      {x:100, y:308, w:260, h:15},
-      // C4: horizontal shelf — ends at x=385 so ball can enter freely from right gap
-      {x:200, y:415, w:185, h:15},
-    ],
-    holes: [
-      {x:300, y:100, r:16},   // C1: below the horizontal wall
-      {x:490, y:198, r:16},   // C2: far right, punishes going too deep
-      {x:235, y:338, r:16},   // C3: below the horizontal block
-      {x:300, y:452, r:16},   // C4: below the shelf
-    ],
-    goal:  {x:55,  y:438, r:20},   // smaller goal, bottom-LEFT
-    start: {x:45,  y:85},
-  },
+// ── Maze ──────────────────────────────────────────────────────────────────────
+const WALLS = [
+  // Border
+  {x:0,   y:0,   w:600, h:15},
+  {x:0,   y:485, w:600, h:15},
+  {x:0,   y:0,   w:15,  h:500},
+  {x:585, y:0,   w:15,  h:500},
+  // Divider 1 — splits top / middle corridor, gap on RIGHT (x=415–585)
+  {x:15,  y:165, w:400, h:15},
+  // Divider 2 — splits middle / bottom corridor, gap on LEFT (x=15–200)
+  {x:200, y:330, w:385, h:15},
+  // Extra wall in top corridor (ball must navigate around it)
+  {x:180, y:80,  w:160, h:15},
+  // Dead-end wall in middle corridor (black hole trap on the right)
+  {x:360, y:220, w:15,  h:110},
 ];
 
+const HOLES = [
+  {x:280, y:122, r:18},   // top area — below the extra wall
+  {x:470, y:255, r:18},   // middle area — dead end
+  {x:100, y:410, r:18},   // bottom area — wrong direction
+];
+
+const GOAL  = {x:545, y:435, r:25};
+const START = {x:45,  y:85};
 const BALL_R = 14;
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentLevel = 0;
-let level = LEVELS[currentLevel];
-let bx = level.start.x, by = level.start.y;
+let bx = START.x, by = START.y;
 let vx = 0, vy = 0;
 let pitch = 0, roll = 0;
 let gameWon = false;
@@ -164,9 +114,9 @@ function connectWS() {
 connectWS();
 
 // ── Physics ───────────────────────────────────────────────────────────────────
-const G             = 1350;  // effective gravity in px/s²
-const ROLL_FRICTION = 2.0;   // rolling friction — higher = stops faster when level
-const WALL_BOUNCE   = 0.25;  // energy kept on wall hit
+const GRAVITY  = 500;   // px/s² per degree of tilt
+const FRICTION = 0.94;
+const MAX_V    = 450;
 
 function update(dt) {
   let tx = roll,  ty = pitch;
@@ -175,22 +125,20 @@ function update(dt) {
   if (keys['ArrowUp'])    ty -= 20;
   if (keys['ArrowDown'])  ty += 20;
 
-  vx += Math.sin(tx * Math.PI / 180) * G * dt;
-  vy += Math.sin(ty * Math.PI / 180) * G * dt;
-
-  const fric = Math.exp(-ROLL_FRICTION * dt);
-  vx *= fric;
-  vy *= fric;
+  vx = (vx + tx * (GRAVITY / 45) * dt) * FRICTION;
+  vy = (vy + ty * (GRAVITY / 45) * dt) * FRICTION;
+  vx = Math.max(-MAX_V, Math.min(MAX_V, vx));
+  vy = Math.max(-MAX_V, Math.min(MAX_V, vy));
 
   bx += vx * dt;
   by += vy * dt;
 
-  for (const w of level.walls) resolveWall(w);
+  for (const w of WALLS) resolveWall(w);
 
   // Black holes — reset ball to start
-  for (const h of level.holes) {
+  for (const h of HOLES) {
     if (dst(bx, by, h.x, h.y) < h.r + BALL_R) {
-      bx = level.start.x; by = level.start.y;
+      bx = START.x; by = START.y;
       vx = 0; vy = 0;
       flashMsg = 'Fell into a black hole — back to start!';
       flashTimer = 2.5;
@@ -199,17 +147,8 @@ function update(dt) {
   }
 
   // Goal
-  if (dst(bx, by, level.goal.x, level.goal.y) < level.goal.r) {
+  if (dst(bx, by, GOAL.x, GOAL.y) < GOAL.r) {
     gameWon = true;
-    const winMsg = document.getElementById('win-msg');
-    const winBtn = document.getElementById('win-btn');
-    if (currentLevel < LEVELS.length - 1) {
-      winMsg.textContent = `Level ${currentLevel + 1} complete!`;
-      winBtn.textContent = 'Next Level';
-    } else {
-      winMsg.textContent = 'You completed all levels!';
-      winBtn.textContent = 'Play Again';
-    }
     document.getElementById('win-screen').style.display = 'flex';
   }
 
@@ -226,10 +165,8 @@ function resolveWall(w) {
     bx += nx * (BALL_R - d);
     by += ny * (BALL_R - d);
     const dot = vx * nx + vy * ny;
-    if (dot < 0) {
-      vx -= (1 + WALL_BOUNCE) * dot * nx;
-      vy -= (1 + WALL_BOUNCE) * dot * ny;
-    }
+    vx -= 1.3 * dot * nx;
+    vy -= 1.3 * dot * ny;
   }
 }
 
@@ -237,26 +174,8 @@ function dst(ax, ay, bx2, by2) {
   return Math.sqrt((ax - bx2) ** 2 + (ay - by2) ** 2);
 }
 
-function winAction() {
-  if (currentLevel < LEVELS.length - 1) {
-    currentLevel++;
-    level = LEVELS[currentLevel];
-    bx = level.start.x; by = level.start.y;
-    vx = 0; vy = 0;
-    gameWon = false;
-    flashMsg = ''; flashTimer = 0;
-    document.getElementById('win-screen').style.display = 'none';
-    lastTime = null;
-    requestAnimationFrame(loop);
-  } else {
-    resetGame();
-  }
-}
-
 function resetGame() {
-  currentLevel = 0;
-  level = LEVELS[currentLevel];
-  bx = level.start.x; by = level.start.y;
+  bx = START.x; by = START.y;
   vx = 0; vy = 0;
   gameWon = false;
   flashMsg = ''; flashTimer = 0;
@@ -276,14 +195,14 @@ function draw() {
 
   // Walls
   ctx.fillStyle = '#2c3e50';
-  for (const w of level.walls) ctx.fillRect(w.x, w.y, w.w, w.h);
+  for (const w of WALLS) ctx.fillRect(w.x, w.y, w.w, w.h);
 
   // Wall highlights (top edge)
   ctx.fillStyle = '#3d566e';
-  for (const w of level.walls) ctx.fillRect(w.x, w.y, w.w, 3);
+  for (const w of WALLS) ctx.fillRect(w.x, w.y, w.w, 3);
 
   // Black holes
-  for (const h of level.holes) {
+  for (const h of HOLES) {
     const g = ctx.createRadialGradient(h.x - 4, h.y - 4, 2, h.x, h.y, h.r);
     g.addColorStop(0, '#000');
     g.addColorStop(1, '#3d0066');
@@ -295,6 +214,19 @@ function draw() {
     ctx.lineWidth = 2;
     ctx.stroke();
   }
+
+  // Goal
+  const gg = ctx.createRadialGradient(GOAL.x, GOAL.y, 4, GOAL.x, GOAL.y, GOAL.r);
+  gg.addColorStop(0, '#00ffaa');
+  gg.addColorStop(1, '#007744');
+  ctx.beginPath();
+  ctx.arc(GOAL.x, GOAL.y, GOAL.r, 0, Math.PI * 2);
+  ctx.fillStyle = gg;
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('GOAL', GOAL.x, GOAL.y + 4);
 
   // Start marker
   ctx.fillStyle = '#ffaa00';
@@ -314,33 +246,17 @@ function draw() {
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // HUD — level + tilt data (top-right to avoid overlap with any goal)
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
-  ctx.fillRect(476, 18, 118, 68);
-  ctx.fillStyle = '#4ecca3';
-  ctx.font = 'bold 11px monospace';
-  ctx.textAlign = 'left';
-  ctx.fillText(`LVL ${currentLevel + 1} / ${LEVELS.length}`, 482, 34);
+  // HUD — tilt data
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(4, 430, 110, 52);
   ctx.fillStyle = '#ccc';
   ctx.font = '10px monospace';
-  ctx.fillText(`pitch: ${pitch.toFixed(1)}°`, 482, 49);
-  ctx.fillText(`roll:  ${roll.toFixed(1)}°`,  482, 63);
-  ctx.fillText(`v: (${vx.toFixed(0)}, ${vy.toFixed(0)})`, 482, 77);
+  ctx.textAlign = 'left';
+  ctx.fillText(`pitch: ${pitch.toFixed(1)}°`, 10, 447);
+  ctx.fillText(`roll:  ${roll.toFixed(1)}°`,  10, 461);
+  ctx.fillText(`v: (${vx.toFixed(0)}, ${vy.toFixed(0)})`, 10, 475);
 
-  // Goal — drawn last so it renders on top of HUD in level 2
-  const gg = ctx.createRadialGradient(level.goal.x, level.goal.y, 4, level.goal.x, level.goal.y, level.goal.r);
-  gg.addColorStop(0, '#00ffaa');
-  gg.addColorStop(1, '#007744');
-  ctx.beginPath();
-  ctx.arc(level.goal.x, level.goal.y, level.goal.r, 0, Math.PI * 2);
-  ctx.fillStyle = gg;
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('GOAL', level.goal.x, level.goal.y + 4);
-
-  // Flash message
+  // Flash message (black hole warning)
   if (flashTimer > 0) {
     ctx.fillStyle = 'rgba(180,0,0,0.82)';
     roundRect(ctx, 120, 210, 360, 56, 8);
