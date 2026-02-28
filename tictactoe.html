@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic-Tac-Toe</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Mode selection screen -->
+    <div id="mode-screen" class="screen">
+      <h1>Tic-Tac-Toe</h1>
+      <p class="subtitle">Choose a game mode</p>
+      <div class="mode-buttons">
+        <button id="btn-pvp" onclick="startGame('pvp')">2 Players</button>
+        <button id="btn-ai" onclick="startGame('ai')">vs AI</button>
+      </div>
+    </div>
+
+    <!-- Game screen -->
+    <div id="game-screen" class="screen hidden">
+      <h1>Tic-Tac-Toe</h1>
+      <div id="status" class="status"></div>
+      <div id="board" class="board">
+        <div class="cell" data-index="0" onclick="handleCellClick(0)"></div>
+        <div class="cell" data-index="1" onclick="handleCellClick(1)"></div>
+        <div class="cell" data-index="2" onclick="handleCellClick(2)"></div>
+        <div class="cell" data-index="3" onclick="handleCellClick(3)"></div>
+        <div class="cell" data-index="4" onclick="handleCellClick(4)"></div>
+        <div class="cell" data-index="5" onclick="handleCellClick(5)"></div>
+        <div class="cell" data-index="6" onclick="handleCellClick(6)"></div>
+        <div class="cell" data-index="7" onclick="handleCellClick(7)"></div>
+        <div class="cell" data-index="8" onclick="handleCellClick(8)"></div>
+      </div>
+      <button id="btn-restart" onclick="resetGame()">Restart</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
