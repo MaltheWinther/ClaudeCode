@@ -1,5 +1,5 @@
 #include "GyroReader.hpp"
-#include "../../gyro-pi/spi_interface.hpp"
+#include "spi_interface.hpp"
 #include <bmi160_wrapper.hpp>
 
 #include <cmath>
