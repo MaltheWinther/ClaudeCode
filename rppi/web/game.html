@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GyroPi — Communicator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+      gap: 12px;
+    }
+    h2 { color: #4ecca3; letter-spacing: 2px; font-size: 1.3rem; }
+    #wrap { position: relative; }
+    canvas { display: block; border: 2px solid #4ecca3; border-radius: 6px; }
+    #status { font-size: 13px; color: #aaa; }
+    #overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #4ecca3;
+      gap: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h2>GyroPi — Communicator</h2>
+  <div id="wrap">
+    <canvas id="c" width="600" height="500"></canvas>
+    <div id="overlay"><div id="overlay-msg"></div></div>
+  </div>
+  <div id="status">Connecting...</div>
+
+<script>
+// ── Level data (mirrors GyroPiGame.cpp) ───────────────────────────────────────
+const LEVELS = [
+  {
+    walls: [
+      {x:0,   y:0,   w:600, h:15}, {x:0,   y:485, w:600, h:15},
+      {x:0,   y:0,   w:15,  h:500}, {x:585, y:0,   w:15,  h:500},
+      {x:15,  y:165, w:400, h:15}, {x:200, y:330, w:385, h:15},
+      {x:180, y:80,  w:160, h:15}, {x:360, y:220, w:15,  h:110},
+    ],
+    holes: [{x:280,y:122,r:18}, {x:470,y:255,r:18}, {x:100,y:410,r:18}],
+    goal:  {x:545, y:435, r:25},
+  },
+  {
+    walls: [
+      {x:0,   y:0,   w:600, h:15}, {x:0,   y:485, w:600, h:15},
+      {x:0,   y:0,   w:15,  h:500}, {x:585, y:0,   w:15,  h:500},
+      {x:15,  y:121, w:405, h:15}, {x:170, y:242, w:415, h:15},
+      {x:15,  y:363, w:405, h:15}, {x:200, y:80,  w:180, h:15},
+      {x:80,  y:196, w:200, h:15}, {x:100, y:308, w:260, h:15},
+      {x:200, y:415, w:185, h:15},
+    ],
+    holes: [{x:300,y:100,r:16}, {x:490,y:198,r:16}, {x:235,y:338,r:16}, {x:300,y:452,r:16}],
+    goal:  {x:55, y:438, r:20},
+  },
+];
+
+const BALL_R = 14;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let bx = 45, by = 85, pitch = 0, roll = 0, level = 0;
+
+// ── WebSocket — receives state from LocalBrowser (C++) ───────────────────────
+const statusEl = document.getElementById('status');
+const ws = new WebSocket(`ws://${location.host}`);
+
+ws.onopen  = () => statusEl.textContent = 'Connected — receiving game state';
+ws.onclose = () => statusEl.textContent = 'Disconnected';
+
+ws.onmessage = e => {
+  const msg = JSON.parse(e.data);
+
+  if (msg.type === 'game_state') {
+    bx    = msg.ball_x;
+    by    = msg.ball_y;
+    pitch = msg.pitch;
+    roll  = msg.roll;
+    level = msg.level - 1;  // server sends 1-indexed
+
+  } else if (msg.type === 'game_over') {
+    document.getElementById('overlay-msg').textContent =
+      msg.win ? '🎉 You win!' : 'Game over';
+    document.getElementById('overlay').style.display = 'flex';
+  }
+};
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+function draw() {
+  const lv = LEVELS[level] || LEVELS[0];
+
+  ctx.fillStyle = '#0f3460';
+  ctx.fillRect(0, 0, 600, 500);
+
+  // Walls
+  ctx.fillStyle = '#2c3e50';
+  for (const w of lv.walls) ctx.fillRect(w.x, w.y, w.w, w.h);
+  ctx.fillStyle = '#3d566e';
+  for (const w of lv.walls) ctx.fillRect(w.x, w.y, w.w, 3);
+
+  // Black holes
+  for (const h of lv.holes) {
+    const g = ctx.createRadialGradient(h.x-4, h.y-4, 2, h.x, h.y, h.r);
+    g.addColorStop(0, '#000'); g.addColorStop(1, '#3d0066');
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, Math.PI*2);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = '#9b00ff'; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  // Start marker
+  ctx.fillStyle = '#ffaa00';
+  ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('START', 20, 62);
+
+  // Ball
+  const bg = ctx.createRadialGradient(bx-4, by-4, 2, bx, by, BALL_R);
+  bg.addColorStop(0, '#aaddff'); bg.addColorStop(1, '#1a6abf');
+  ctx.beginPath(); ctx.arc(bx, by, BALL_R, 0, Math.PI*2);
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.strokeStyle = '#4ecca3'; ctx.lineWidth = 2; ctx.stroke();
+
+  // HUD
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(476, 18, 118, 68);
+  ctx.fillStyle = '#4ecca3'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'left';
+  ctx.fillText(`LVL ${level+1} / ${LEVELS.length}`, 482, 34);
+  ctx.fillStyle = '#ccc'; ctx.font = '10px monospace';
+  ctx.fillText(`pitch: ${pitch.toFixed(1)}°`, 482, 49);
+  ctx.fillText(`roll:  ${roll.toFixed(1)}°`,  482, 63);
+
+  // Goal
+  const gg = ctx.createRadialGradient(lv.goal.x, lv.goal.y, 4, lv.goal.x, lv.goal.y, lv.goal.r);
+  gg.addColorStop(0, '#00ffaa'); gg.addColorStop(1, '#007744');
+  ctx.beginPath(); ctx.arc(lv.goal.x, lv.goal.y, lv.goal.r, 0, Math.PI*2);
+  ctx.fillStyle = gg; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('GOAL', lv.goal.x, lv.goal.y + 4);
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
