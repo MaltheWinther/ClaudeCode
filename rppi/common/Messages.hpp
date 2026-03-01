@@ -42,16 +42,20 @@ namespace Role {
 // ─────────────────────────────────────────────
 
 struct MsgCreateRoom {
-    static json build() {
-        return { {"type", MsgType::CREATE_ROOM} };
+    static json build(const std::string& username = "") {
+        json j = { {"type", MsgType::CREATE_ROOM} };
+        if (!username.empty()) j["username"] = username;
+        return j;
     }
 };
 
 struct MsgJoinRoom {
     std::string code;
 
-    static json build(const std::string& code) {
-        return { {"type", MsgType::JOIN_ROOM}, {"code", code} };
+    static json build(const std::string& code, const std::string& username = "") {
+        json j = { {"type", MsgType::JOIN_ROOM}, {"code", code} };
+        if (!username.empty()) j["username"] = username;
+        return j;
     }
     static MsgJoinRoom parse(const json& j) {
         return { j.at("code").get<std::string>() };

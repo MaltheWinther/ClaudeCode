@@ -13,8 +13,8 @@ static double nowMs() {
 
 GameClient::GameClient(const std::string& host, int port,
                        const std::string& role,
-                       GyroReader* gyro, LocalBrowser* browser)
-    : host_(host), port_(port), role_(role), gyro_(gyro), browser_(browser)
+                       GyroReader* gyro)
+    : host_(host), port_(port), role_(role), gyro_(gyro)
 {
     s_game = this;
 
@@ -49,7 +49,7 @@ void GameClient::run() {
 
     running_ = true;
     while (running_) {
-        lws_service(context_, 5);  // short timeout so gyro sends stay on schedule
+        lws_service(context_, 5);
         if (role_ == Role::PERFORMER) sendGyroIfDue();
     }
 }
@@ -95,13 +95,12 @@ void GameClient::onMessage(const std::string& raw) {
     const json j = json::parse(raw);
 
     if (type == MsgType::GAME_STATE) {
-        // Both roles receive game_state — push to local browser display
-        if (browser_) browser_->push(j);
+        if (onGameState_) onGameState_(MsgGameState::parse(j));
 
     } else if (type == MsgType::GAME_OVER) {
         auto msg = MsgGameOver::parse(j);
         std::cout << "[Game] Game over — " << (msg.win ? "WIN" : "LOSS") << "\n";
-        if (browser_) browser_->push(j);
+        if (onGameOver_) onGameOver_(msg.win);
         running_ = false;
 
     } else if (type == MsgType::ERROR) {
@@ -133,8 +132,8 @@ void GameClient::sendGyroIfDue() {
     if (now - lastGyroSendMs_ < GYRO_INTERVAL_MS) return;
     lastGyroSendMs_ = now;
 
-    auto [pitch, roll] = gyro_->read();
-    enqueue(MsgGyroData::build(pitch, roll));
+    auto angles = gyro_->read();
+    enqueue(MsgGyroData::build(angles.pitch, angles.roll));
     lws_callback_on_writable(wsi_);
 }
 

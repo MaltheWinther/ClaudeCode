@@ -1,4 +1,17 @@
 #include "GyroReader.hpp"
+
+#ifndef __linux__
+// ── Non-Linux stub (development only — RPi hardware not available) ──────────
+GyroReader::GyroReader(const char*) {}
+GyroReader::~GyroReader() { stop(); }
+void GyroReader::start() {}
+void GyroReader::stop() { running_ = false; }
+GyroReader::Angles GyroReader::read() const { return {}; }
+void GyroReader::loop() {}
+void GyroReader::updateFilter(int16_t, int16_t, int16_t, int16_t, int16_t) {}
+
+#else
+// ── Linux / RPi implementation ────────────────────────────────────────────────
 #include "spi_interface.hpp"
 #include <bmi160_wrapper.hpp>
 
@@ -57,3 +70,5 @@ void GyroReader::updateFilter(int16_t ax, int16_t ay, int16_t az,
     pitch_ = ALPHA * (pitch_ + gy * GYRO_SCALE * DT) + (1.0 - ALPHA) * ap;
     roll_  = ALPHA * (roll_  + gx * GYRO_SCALE * DT) + (1.0 - ALPHA) * ar;
 }
+
+#endif // __linux__

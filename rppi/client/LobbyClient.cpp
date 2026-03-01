@@ -15,7 +15,7 @@ LobbyClient::LobbyClient(const std::string& host, int port)
     };
 
     lws_context_creation_info info{};
-    info.port      = CONTEXT_PORT_NO_LISTEN;  // client — no listening port
+    info.port      = CONTEXT_PORT_NO_LISTEN;
     info.protocols = protocols;
 
     context_ = lws_create_context(&info);
@@ -26,11 +26,15 @@ LobbyClient::~LobbyClient() {
     if (context_) lws_context_destroy(context_);
 }
 
-void LobbyClient::createRoom() { intent_ = Intent::CREATE; }
+void LobbyClient::createRoom(const std::string& username) {
+    intent_   = Intent::CREATE;
+    username_ = username;
+}
 
-void LobbyClient::joinRoom(const std::string& code) {
+void LobbyClient::joinRoom(const std::string& code, const std::string& username) {
     intent_   = Intent::JOIN;
     joinCode_ = code;
+    username_ = username;
 }
 
 void LobbyClient::run() {
@@ -50,6 +54,18 @@ void LobbyClient::run() {
         lws_service(context_, 50);
 }
 
+// Called from any thread — enqueues START_GAME and wakes the lws loop
+void LobbyClient::requestStart() {
+    {
+        std::lock_guard<std::mutex> lk(queueMutex_);
+        outQueue_.push(MsgStartGame::build().dump());
+        pendingWake_ = true;
+    }
+    lws_cancel_service(context_);  // thread-safe — wakes lws_service()
+}
+
+// ── Static lws callback ───────────────────────────────────────────────────────
+
 int LobbyClient::wsCallback(lws* wsi, lws_callback_reasons reason,
                              void* /*user*/, void* in, size_t len) {
     if (!s_lobby) return 0;
@@ -66,21 +82,26 @@ int LobbyClient::wsCallback(lws* wsi, lws_callback_reasons reason,
         case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
             s_lobby->onError();
             break;
+        case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+            s_lobby->onWaitCancelled();
+            break;
         default:
             break;
     }
     return 0;
 }
 
+// ── Private handlers ──────────────────────────────────────────────────────────
+
 void LobbyClient::onConnect(lws* wsi) {
     wsi_ = wsi;
     std::cout << "[Lobby] Connected to server\n";
 
-    // Send the first lobby action immediately
+    std::lock_guard<std::mutex> lk(queueMutex_);
     if (intent_ == Intent::CREATE)
-        enqueue(MsgCreateRoom::build());
+        outQueue_.push(MsgCreateRoom::build(username_).dump());
     else
-        enqueue(MsgJoinRoom::build(joinCode_));
+        outQueue_.push(MsgJoinRoom::build(joinCode_, username_).dump());
 
     lws_callback_on_writable(wsi_);
 }
@@ -94,34 +115,34 @@ void LobbyClient::onMessage(const std::string& raw) {
 
     if (type == MsgType::ROOM_CREATED) {
         roomCode_ = MsgRoomCreated::parse(j).code;
-        std::cout << "[Lobby] Room created: " << roomCode_
-                  << " — waiting for another player...\n";
+        std::cout << "[Lobby] Room created: " << roomCode_ << "\n";
+        if (onRoomCreated_) onRoomCreated_(roomCode_);
 
     } else if (type == MsgType::ROOM_JOINED) {
         roomCode_ = MsgRoomJoined::parse(j).code;
-        std::cout << "[Lobby] Joined room: " << roomCode_ << "\n";
-
-        // If we joined someone else's room, trigger start
-        if (intent_ == Intent::JOIN) {
-            enqueue(MsgStartGame::build());
-            lws_callback_on_writable(wsi_);
-        }
+        std::cout << "[Lobby] Room joined: " << roomCode_ << "\n";
+        // Host receives ROOM_JOINED when a guest connects
+        if (intent_ == Intent::CREATE)
+            if (onPlayerJoined_) onPlayerJoined_(2);
 
     } else if (type == MsgType::ROLE_ASSIGNED) {
         auto msg  = MsgRoleAssigned::parse(j);
         role_     = msg.role;
         gamePort_ = msg.gamePort;
-        std::cout << "[Lobby] Role: " << role_
-                  << " — game on port " << gamePort_ << "\n";
-        running_ = false;  // unblock run()
+        std::cout << "[Lobby] Role: " << role_ << " — game port " << gamePort_ << "\n";
+        if (onRoleAssigned_) onRoleAssigned_(role_, gamePort_);
+        running_ = false;
 
     } else if (type == MsgType::ERROR) {
-        std::cerr << "[Lobby] Server error: " << MsgError::parse(j).message << "\n";
+        std::string msg = MsgError::parse(j).message;
+        std::cerr << "[Lobby] Server error: " << msg << "\n";
+        if (onError_) onError_(msg);
         running_ = false;
     }
 }
 
 void LobbyClient::onWritable(lws* wsi) {
+    std::lock_guard<std::mutex> lk(queueMutex_);
     if (outQueue_.empty()) return;
 
     const std::string& msg = outQueue_.front();
@@ -135,9 +156,12 @@ void LobbyClient::onWritable(lws* wsi) {
 
 void LobbyClient::onError() {
     std::cerr << "[Lobby] Connection error\n";
+    if (onError_) onError_("Could not connect to server");
     running_ = false;
 }
 
-void LobbyClient::enqueue(const json& msg) {
-    outQueue_.push(msg.dump());
+// Called in the lws thread after lws_cancel_service() wakes the loop
+void LobbyClient::onWaitCancelled() {
+    if (pendingWake_.exchange(false) && wsi_)
+        lws_callback_on_writable(wsi_);
 }
