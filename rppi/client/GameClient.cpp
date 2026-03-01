@@ -126,6 +126,7 @@ void GameClient::onWritable(lws* wsi) {
 
 void GameClient::onError() {
     std::cerr << "[Game] Connection error\n";
+    if (onError_cb_) onError_cb_("The other player disconnected");
     running_ = false;
 }
 

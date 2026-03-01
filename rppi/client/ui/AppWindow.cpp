@@ -97,3 +97,4 @@ void AppWindow::showDisconnect(const QString& msg) {
     gameOverScreen_->setDisconnect(msg);
     stack_->setCurrentWidget(gameOverScreen_);
 }
+

@@ -7,38 +7,46 @@
 RoleScreen::RoleScreen(QWidget* parent) : QWidget(parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setAlignment(Qt::AlignCenter);
-    layout->setSpacing(20);
+    layout->setSpacing(16);
+
+    auto* title = new QLabel("Get Ready!", this);
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet("font-size: 36px; font-weight: bold; color: #2196F3;");
 
     gameLabel_ = new QLabel(this);
     gameLabel_->setAlignment(Qt::AlignCenter);
-    gameLabel_->setStyleSheet("font-size: 28px; color: #aaa;");
+    gameLabel_->setStyleSheet("font-size: 16px; color: #888;");
 
-    auto* yourRoleLabel = new QLabel("Your Role:", this);
+    auto* yourRoleLabel = new QLabel("Your role for this game:", this);
     yourRoleLabel->setAlignment(Qt::AlignCenter);
-    yourRoleLabel->setStyleSheet("font-size: 22px; color: #ccc;");
+    yourRoleLabel->setStyleSheet("font-size: 18px; color: #666;");
 
     roleLabel_ = new QLabel(this);
     roleLabel_->setAlignment(Qt::AlignCenter);
-    roleLabel_->setStyleSheet("font-size: 64px; font-weight: bold; color: #FFD700;");
+    roleLabel_->setStyleSheet(
+        "font-size: 48px; font-weight: bold; color: #2196F3;"
+        "background: #E3F2FD; border-radius: 12px; padding: 16px 40px;");
 
     descLabel_ = new QLabel(this);
     descLabel_->setAlignment(Qt::AlignCenter);
     descLabel_->setWordWrap(true);
-    descLabel_->setStyleSheet("font-size: 18px; color: #aaa;");
+    descLabel_->setStyleSheet("font-size: 18px; color: #444;");
 
     countdownLabel_ = new QLabel(this);
     countdownLabel_->setAlignment(Qt::AlignCenter);
     countdownLabel_->setStyleSheet(
-        "font-size: 120px; font-weight: bold; color: #FFD700;");
+        "font-size: 96px; font-weight: bold; color: #FF9800;");
     countdownLabel_->hide();
 
     layout->addStretch();
+    layout->addWidget(title);
     layout->addWidget(gameLabel_);
-    layout->addSpacing(10);
+    layout->addSpacing(16);
     layout->addWidget(yourRoleLabel);
-    layout->addWidget(roleLabel_);
+    layout->addWidget(roleLabel_, 0, Qt::AlignCenter);
+    layout->addSpacing(8);
     layout->addWidget(descLabel_);
-    layout->addSpacing(20);
+    layout->addSpacing(24);
     layout->addWidget(countdownLabel_);
     layout->addStretch();
 }
@@ -49,10 +57,8 @@ void RoleScreen::setRole(const QString& role, const QString& game) {
 
     if (role == "communicator") {
         descLabel_->setText("You see the maze on screen.\nGuide your partner by voice!");
-        setStyleSheet("background-color: #0d2137;");
     } else {
         descLabel_->setText("You control the ball by tilting\nthe Raspberry Pi.");
-        setStyleSheet("background-color: #1a2a0a;");
     }
 
     // 3-2-1 countdown then emit done()

@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+class QTimer;
+
 class GameScreen : public QWidget {
     Q_OBJECT
 public:
@@ -25,6 +27,13 @@ private:
     float   pitch_ = 0.f;
     float   roll_  = 0.f;
     int     level_ = 1;
+
+    // Black hole flash
+    float   prevBallX_    = 45.f;
+    float   prevBallY_    = 85.f;
+    int     prevLevel_    = 1;
+    bool    showHoleFlash_= false;
+    QTimer* flashTimer_   = nullptr;
 
     // Maze canvas dimensions matching GyroPiGame
     static constexpr float MAZE_W = 600.f;

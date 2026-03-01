@@ -4,6 +4,7 @@
 #include <QPaintEvent>
 #include <QRadialGradient>
 #include <QFont>
+#include <QTimer>
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -65,6 +66,29 @@ void GameScreen::setRole(const QString& role) {
 
 void GameScreen::updateGameState(float ballX, float ballY,
                                  float pitch, float roll, int level) {
+    // Detect black hole reset: large position jump on the same level
+    if (role_ == "communicator") {
+        float dx = ballX - prevBallX_;
+        float dy = ballY - prevBallY_;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        if (dist > 80.f && level == prevLevel_) {
+            showHoleFlash_ = true;
+            if (!flashTimer_) {
+                flashTimer_ = new QTimer(this);
+                flashTimer_->setSingleShot(true);
+                connect(flashTimer_, &QTimer::timeout, this, [this]() {
+                    showHoleFlash_ = false;
+                    update();
+                });
+            }
+            flashTimer_->start(1500);
+        }
+    }
+
+    prevBallX_ = ballX;
+    prevBallY_ = ballY;
+    prevLevel_ = level;
+
     ballX_ = ballX;
     ballY_ = ballY;
     pitch_ = pitch;
@@ -154,6 +178,16 @@ void GameScreen::drawCommunicatorView(QPainter& p) {
         p.setPen(Qt::NoPen);
         p.setBrush(bg);
         p.drawEllipse(bc, r, r);
+    }
+
+    // Black hole flash overlay
+    if (showHoleFlash_) {
+        p.fillRect(QRect(0, height() / 2 - 36, width(), 72),
+                   QColor(180, 20, 20, 200));
+        p.setPen(QColor(255, 240, 240));
+        p.setFont(QFont("Arial", 22, QFont::Bold));
+        p.drawText(QRect(0, height() / 2 - 36, width(), 72),
+                   Qt::AlignCenter, "Fell into a black hole!  Resetting...");
     }
 }
 

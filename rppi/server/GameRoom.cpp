@@ -131,8 +131,12 @@ void GameRoom::onDisconnect(lws* wsi) {
 
     writeQueues_.erase(wsi);
 
-    if (remaining)
+    if (remaining) {
         sendTo(remaining, MsgError::build("The other player disconnected"));
+        // Give lws a few cycles to flush the message before stopping
+        for (int i = 0; i < 10; ++i)
+            lws_service(context_, 10);
+    }
 
     stop();
     std::cout << "[Room " << roomCode_ << "] A player disconnected, shutting down\n";

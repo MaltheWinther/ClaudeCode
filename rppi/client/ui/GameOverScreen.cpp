@@ -15,12 +15,14 @@ GameOverScreen::GameOverScreen(QWidget* parent) : QWidget(parent) {
 
     subtitleLabel_ = new QLabel(this);
     subtitleLabel_->setAlignment(Qt::AlignCenter);
-    subtitleLabel_->setStyleSheet("font-size: 24px; color: #666;");
+    subtitleLabel_->setStyleSheet("font-size: 20px; color: #666;");
 
-    // Leaderboard container
+    // Leaderboard card container
     leaderboardWidget_ = new QWidget(this);
+    leaderboardWidget_->setStyleSheet("background-color: #F5F5F5; border-radius: 12px;");
     leaderboardLayout_ = new QVBoxLayout(leaderboardWidget_);
-    leaderboardLayout_->setSpacing(4);
+    leaderboardLayout_->setSpacing(6);
+    leaderboardLayout_->setContentsMargins(24, 16, 24, 16);
     leaderboardWidget_->hide();
 
     auto* playAgainBtn = new QPushButton("PLAY AGAIN", this);
@@ -63,28 +65,27 @@ void GameOverScreen::clearLeaderboard() {
 
 void GameOverScreen::setResult(bool win, int elapsedSecs, int levelsReached,
                                const std::vector<LeaderboardEntry>& leaderboard) {
-    setStyleSheet("");  // reset disconnect styling
-
     if (win) {
         resultLabel_->setText("YOU WIN!");
         resultLabel_->setStyleSheet(
-            "font-size: 72px; font-weight: bold; color: #4CAF50;");
+            "font-size: 64px; font-weight: bold; color: #4CAF50;");
     } else {
         resultLabel_->setText("GAME OVER");
         resultLabel_->setStyleSheet(
-            "font-size: 72px; font-weight: bold; color: #F44336;");
+            "font-size: 64px; font-weight: bold; color: #F44336;");
     }
 
-    subtitleLabel_->setStyleSheet("font-size: 24px; color: #666;");
+    subtitleLabel_->setStyleSheet("font-size: 20px; color: #666;");
     subtitleLabel_->setText(
         QString("Time: %1s  |  Level %2/2").arg(elapsedSecs).arg(levelsReached));
 
     // Build leaderboard
     clearLeaderboard();
     if (!leaderboard.empty()) {
-        auto* title = new QLabel("── Top 5 ──", leaderboardWidget_);
+        auto* title = new QLabel("TOP 5", leaderboardWidget_);
         title->setAlignment(Qt::AlignCenter);
-        title->setStyleSheet("font-size: 18px; color: #888; margin-bottom: 4px;");
+        title->setStyleSheet(
+            "font-size: 14px; font-weight: bold; color: #888; letter-spacing: 2px;");
         leaderboardLayout_->addWidget(title);
 
         int rank = 1;
@@ -94,11 +95,11 @@ void GameOverScreen::setResult(bool win, int elapsedSecs, int levelsReached,
                 .arg(QString::fromStdString(e.players))
                 .arg(e.elapsedSecs)
                 .arg(e.levelsReached)
-                .arg(e.won ? "✓" : "✗");
+                .arg(e.won ? "\u2713" : "\u2717");
 
             auto* lbl = new QLabel(line, leaderboardWidget_);
             lbl->setAlignment(Qt::AlignCenter);
-            lbl->setStyleSheet("font-size: 16px; color: #ccc;");
+            lbl->setStyleSheet("font-size: 16px; color: #444;");
             leaderboardLayout_->addWidget(lbl);
         }
         leaderboardWidget_->show();
@@ -108,13 +109,11 @@ void GameOverScreen::setResult(bool win, int elapsedSecs, int levelsReached,
 }
 
 void GameOverScreen::setDisconnect(const QString& msg) {
-    setStyleSheet("background-color: #1a1a00;");
-
     resultLabel_->setText("DISCONNECTED");
     resultLabel_->setStyleSheet(
-        "font-size: 64px; font-weight: bold; color: #FF9800;");
+        "font-size: 56px; font-weight: bold; color: #FF9800;");
 
-    subtitleLabel_->setStyleSheet("font-size: 20px; color: #aaa;");
+    subtitleLabel_->setStyleSheet("font-size: 20px; color: #666;");
     subtitleLabel_->setText(msg);
 
     clearLeaderboard();
