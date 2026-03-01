@@ -11,6 +11,24 @@ Testing GyroPi with 3 Raspberry Pis: one server, two players.
 
 ---
 
+## Step 0 — Connect all RPis to the same Wi-Fi (first time only)
+
+Do this for each RPi before anything else:
+
+1. Plug in an ethernet cable and SSH in via the ethernet IP
+2. Run `sudo raspi-config` → **System Options** → **Wireless LAN** → enter the Wi-Fi name and password
+3. Find the Wi-Fi IP address:
+   ```bash
+   hostname -I
+   ```
+   You'll see two IPs — the Wi-Fi one is usually `192.168.x.x`
+4. Open a new SSH session using the Wi-Fi IP to confirm it works
+5. Unplug the ethernet cable
+
+All three RPis must be on the same Wi-Fi before proceeding.
+
+---
+
 ## Step 1 — Install dependencies (first time only, on each RPi)
 
 **On the server RPi:**
