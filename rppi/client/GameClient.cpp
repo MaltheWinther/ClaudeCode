@@ -100,11 +100,15 @@ void GameClient::onMessage(const std::string& raw) {
     } else if (type == MsgType::GAME_OVER) {
         auto msg = MsgGameOver::parse(j);
         std::cout << "[Game] Game over — " << (msg.win ? "WIN" : "LOSS") << "\n";
-        if (onGameOver_) onGameOver_(msg.win);
+        if (onGameOver_)
+            onGameOver_(msg.win, msg.elapsedSecs, msg.levelsReached, msg.leaderboard);
         running_ = false;
 
     } else if (type == MsgType::ERROR) {
-        std::cerr << "[Game] Server error: " << MsgError::parse(j).message << "\n";
+        auto errMsg = MsgError::parse(j).message;
+        std::cerr << "[Game] Error: " << errMsg << "\n";
+        if (onError_cb_) onError_cb_(errMsg);
+        running_ = false;
     }
 }
 

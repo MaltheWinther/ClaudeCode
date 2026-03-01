@@ -7,13 +7,16 @@
 #include <mutex>
 #include <atomic>
 #include <memory>
+#include <chrono>
 #include <libwebsockets.h>
 #include "../common/Messages.hpp"
 #include "IGame.hpp"
 
 class GameRoom {
 public:
-    GameRoom(const std::string& roomCode, int port);
+    GameRoom(const std::string& roomCode, int port,
+             const std::string& hostName = "",
+             const std::string& guestName = "");
     ~GameRoom();
 
     void run();   // blocking — lws event loop + game loop thread
@@ -40,15 +43,20 @@ private:
 
     // ── Helpers ──────────────────────────────────────────────────────────
     void sendTo(lws* wsi, const json& msg);
+    std::string currentDate() const;
 
     // ── Members ──────────────────────────────────────────────────────────
     std::string  roomCode_;
     int          port_;
+    std::string  players_;    // "Host & Guest" for leaderboard
     bool         running_    = false;
     lws_context* context_    = nullptr;
 
     lws* performer_    = nullptr;
     lws* communicator_ = nullptr;
+
+    using clock = std::chrono::steady_clock;
+    std::chrono::time_point<clock> gameStartTime_;
 
     // Latest gyro input — written by lws thread, read by game loop thread
     struct GyroInput { float pitch = 0.f; float roll = 0.f; };

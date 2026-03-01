@@ -23,8 +23,9 @@ public:
 
     void run();  // blocking — returns when game is over
 
-    void setOnGameState(std::function<void(MsgGameState)> cb) { onGameState_ = std::move(cb); }
-    void setOnGameOver (std::function<void(bool win)>     cb) { onGameOver_  = std::move(cb); }
+    void setOnGameState(std::function<void(MsgGameState)>                                          cb) { onGameState_ = std::move(cb); }
+    void setOnGameOver (std::function<void(bool, int, int, std::vector<LeaderboardEntry>)>         cb) { onGameOver_  = std::move(cb); }
+    void setOnError    (std::function<void(std::string)>                                           cb) { onError_cb_  = std::move(cb); }
 
     static int wsCallback(lws* wsi, lws_callback_reasons reason,
                           void* user, void* in, size_t len);
@@ -47,8 +48,9 @@ private:
 
     std::queue<std::string> outQueue_;
 
-    std::function<void(MsgGameState)> onGameState_;
-    std::function<void(bool)>         onGameOver_;
+    std::function<void(MsgGameState)>                                  onGameState_;
+    std::function<void(bool, int, int, std::vector<LeaderboardEntry>)> onGameOver_;
+    std::function<void(std::string)>                                   onError_cb_;
 
     double lastGyroSendMs_ = 0.0;
     static constexpr double GYRO_INTERVAL_MS = 25.0;  // ~40 Hz

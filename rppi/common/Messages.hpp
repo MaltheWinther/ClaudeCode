@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -19,10 +20,11 @@ namespace MsgType {
     constexpr auto GYRO_DATA    = "gyro_data";
 
     // Server → Client (Lobby)
-    constexpr auto ROOM_CREATED = "room_created";
-    constexpr auto ROOM_JOINED  = "room_joined";
+    constexpr auto ROOM_CREATED  = "room_created";
+    constexpr auto ROOM_JOINED   = "room_joined";
+    constexpr auto PLAYER_JOINED = "player_joined";  // replaces ROOM_JOINED for host notify
     constexpr auto ROLE_ASSIGNED = "role_assigned";
-    constexpr auto ERROR        = "error";
+    constexpr auto ERROR         = "error";
 
     // Server → Client (Game)
     constexpr auto GAME_STATE   = "game_state";
@@ -36,6 +38,17 @@ namespace Role {
     constexpr auto PERFORMER    = "performer";
     constexpr auto COMMUNICATOR = "communicator";
 }
+
+// ─────────────────────────────────────────────
+//  Leaderboard entry
+// ─────────────────────────────────────────────
+struct LeaderboardEntry {
+    std::string players;      // "Alice & Bob"
+    int         elapsedSecs;
+    int         levelsReached;
+    bool        won;
+    std::string date;         // "2026-03-01"
+};
 
 // ─────────────────────────────────────────────
 //  Client → Server messages
@@ -117,6 +130,22 @@ struct MsgRoomJoined {
     }
 };
 
+struct MsgPlayerJoined {
+    std::string hostName;
+    std::string guestName;
+    int         count;
+
+    static json build(const std::string& h, const std::string& g, int count) {
+        return { {"type", MsgType::PLAYER_JOINED},
+                 {"host_name", h}, {"guest_name", g}, {"count", count} };
+    }
+    static MsgPlayerJoined parse(const json& j) {
+        return { j.at("host_name").get<std::string>(),
+                 j.at("guest_name").get<std::string>(),
+                 j.at("count").get<int>() };
+    }
+};
+
 struct MsgRoleAssigned {
     std::string role;  // Role::PERFORMER or Role::COMMUNICATOR
     int gamePort;      // port the GameRoom process is listening on
@@ -170,12 +199,44 @@ struct MsgGameState {
 
 struct MsgGameOver {
     bool win;
+    int  elapsedSecs   = 0;
+    int  levelsReached = 1;
+    std::vector<LeaderboardEntry> leaderboard;
 
-    static json build(bool win) {
-        return { {"type", MsgType::GAME_OVER}, {"win", win} };
+    static json build(bool win, int elapsed = 0, int levels = 1,
+                      const std::vector<LeaderboardEntry>& lb = {}) {
+        json j = { {"type", MsgType::GAME_OVER}, {"win", win},
+                   {"elapsed_secs", elapsed}, {"levels_reached", levels} };
+        json lbArr = json::array();
+        for (const auto& e : lb) {
+            lbArr.push_back({
+                {"players", e.players},
+                {"elapsed_secs", e.elapsedSecs},
+                {"levels_reached", e.levelsReached},
+                {"won", e.won},
+                {"date", e.date}
+            });
+        }
+        j["leaderboard"] = lbArr;
+        return j;
     }
     static MsgGameOver parse(const json& j) {
-        return { j.at("win").get<bool>() };
+        MsgGameOver msg;
+        msg.win           = j.at("win").get<bool>();
+        msg.elapsedSecs   = j.value("elapsed_secs",   0);
+        msg.levelsReached = j.value("levels_reached",  1);
+        if (j.contains("leaderboard")) {
+            for (const auto& e : j.at("leaderboard")) {
+                msg.leaderboard.push_back({
+                    e.value("players",        ""),
+                    e.value("elapsed_secs",   0),
+                    e.value("levels_reached", 1),
+                    e.value("won",            false),
+                    e.value("date",           "")
+                });
+            }
+        }
+        return msg;
     }
 };
 

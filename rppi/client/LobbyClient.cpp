@@ -121,9 +121,12 @@ void LobbyClient::onMessage(const std::string& raw) {
     } else if (type == MsgType::ROOM_JOINED) {
         roomCode_ = MsgRoomJoined::parse(j).code;
         std::cout << "[Lobby] Room joined: " << roomCode_ << "\n";
-        // Host receives ROOM_JOINED when a guest connects
-        if (intent_ == Intent::CREATE)
-            if (onPlayerJoined_) onPlayerJoined_(2);
+        // Guest side — room code stored; player count update comes via PLAYER_JOINED
+
+    } else if (type == MsgType::PLAYER_JOINED) {
+        auto msg = MsgPlayerJoined::parse(j);
+        std::cout << "[Lobby] Players: " << msg.hostName << " & " << msg.guestName << "\n";
+        if (onPlayerJoined_) onPlayerJoined_(msg.count, msg.hostName, msg.guestName);
 
     } else if (type == MsgType::ROLE_ASSIGNED) {
         auto msg  = MsgRoleAssigned::parse(j);

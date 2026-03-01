@@ -92,8 +92,9 @@ void LobbyServer::onMessage(lws* wsi, const std::string& raw) {
         return;
     }
 
-    if      (type == MsgType::CREATE_ROOM) handleCreateRoom(wsi);
-    else if (type == MsgType::JOIN_ROOM)   handleJoinRoom(wsi, json::parse(raw));
+    const json j = json::parse(raw);
+    if      (type == MsgType::CREATE_ROOM) handleCreateRoom(wsi, j);
+    else if (type == MsgType::JOIN_ROOM)   handleJoinRoom(wsi, j);
     else if (type == MsgType::START_GAME)  handleStartGame(wsi);
     else    sendTo(wsi, MsgError::build("Unknown message type: " + type));
 }
@@ -126,19 +127,21 @@ void LobbyServer::onDisconnect(lws* wsi) {
 
 // ── Lobby message handlers ───────────────────────────────────────────────────
 
-void LobbyServer::handleCreateRoom(lws* wsi) {
+void LobbyServer::handleCreateRoom(lws* wsi, const json& j) {
     // Reject if client is already in a room
     if (clientRooms_.count(wsi)) {
         sendTo(wsi, MsgError::build("Already in a room"));
         return;
     }
 
+    std::string hostName = j.value("username", "Host");
+
     std::string code = generateRoomCode();
-    rooms_[code]     = { code, wsi, nullptr, Room::State::WAITING };
+    rooms_[code]     = { code, hostName, "", wsi, nullptr, Room::State::WAITING };
     clientRooms_[wsi] = code;
 
     sendTo(wsi, MsgRoomCreated::build(code));
-    std::cout << "[Lobby] Room created: " << code << "\n";
+    std::cout << "[Lobby] Room created: " << code << " by " << hostName << "\n";
 }
 
 void LobbyServer::handleJoinRoom(lws* wsi, const json& j) {
@@ -163,13 +166,23 @@ void LobbyServer::handleJoinRoom(lws* wsi, const json& j) {
         return;
     }
 
-    room.guest = wsi;
-    room.state = Room::State::FULL;
+    std::string guestName = j.value("username", "Guest");
+
+    room.guest     = wsi;
+    room.guestName = guestName;
+    room.state     = Room::State::FULL;
     clientRooms_[wsi] = code;
 
-    sendTo(wsi,       MsgRoomJoined::build(code));
-    sendTo(room.host, MsgRoomJoined::build(code));  // notify host too
-    std::cout << "[Lobby] Room " << code << " is now full\n";
+    // Send PLAYER_JOINED to both players (replaces separate ROOM_JOINED for host)
+    auto pjMsg = MsgPlayerJoined::build(room.hostName, guestName, 2);
+    sendTo(wsi,       pjMsg);
+    sendTo(room.host, pjMsg);
+
+    // Guest still needs ROOM_JOINED so it knows the room code
+    sendTo(wsi, MsgRoomJoined::build(code));
+
+    std::cout << "[Lobby] Room " << code << " is now full ("
+              << room.hostName << " & " << guestName << ")\n";
 }
 
 void LobbyServer::handleStartGame(lws* wsi) {
@@ -194,7 +207,7 @@ void LobbyServer::handleStartGame(lws* wsi) {
     lws* performer   = hostIsPerformer ? room.host : room.guest;
     lws* communicator = hostIsPerformer ? room.guest : room.host;
 
-    int gamePort = spawnGameRoom(room.code);
+    int gamePort = spawnGameRoom(room.code, room.hostName, room.guestName);
 
     sendTo(performer,    MsgRoleAssigned::build(Role::PERFORMER,    gamePort));
     sendTo(communicator, MsgRoleAssigned::build(Role::COMMUNICATOR, gamePort));
@@ -223,7 +236,9 @@ std::string LobbyServer::generateRoomCode() {
     return code;
 }
 
-int LobbyServer::spawnGameRoom(const std::string& roomCode) {
+int LobbyServer::spawnGameRoom(const std::string& roomCode,
+                               const std::string& hostName,
+                               const std::string& guestName) {
     int port = nextGamePort_++;
 
     pid_t pid = fork();
@@ -232,6 +247,8 @@ int LobbyServer::spawnGameRoom(const std::string& roomCode) {
         execl("./bin/game_room", "game_room",
               roomCode.c_str(),
               std::to_string(port).c_str(),
+              hostName.c_str(),
+              guestName.c_str(),
               nullptr);
         std::cerr << "[Lobby] execl failed\n";
         _exit(1);

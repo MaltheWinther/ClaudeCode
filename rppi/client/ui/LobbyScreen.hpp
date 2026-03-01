@@ -13,6 +13,7 @@ public:
     void setupHost(const QString& code, int playerCount);
     void setupGuest(const QString& code);
     void setPlayerCount(int count);
+    void setPlayers(int count, const QString& hostName, const QString& guestName);
 
 signals:
     void startClicked();

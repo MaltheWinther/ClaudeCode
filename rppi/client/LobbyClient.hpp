@@ -32,10 +32,10 @@ public:
     int         getGamePort() const { return gamePort_; }
 
     // Callbacks (set before calling run())
-    void setOnRoomCreated (std::function<void(std::string code)>      cb) { onRoomCreated_  = std::move(cb); }
-    void setOnPlayerJoined(std::function<void(int count)>             cb) { onPlayerJoined_ = std::move(cb); }
-    void setOnRoleAssigned(std::function<void(std::string, int port)> cb) { onRoleAssigned_ = std::move(cb); }
-    void setOnError       (std::function<void(std::string msg)>       cb) { onError_        = std::move(cb); }
+    void setOnRoomCreated (std::function<void(std::string code)>                        cb) { onRoomCreated_  = std::move(cb); }
+    void setOnPlayerJoined(std::function<void(int, std::string, std::string)>           cb) { onPlayerJoined_ = std::move(cb); }
+    void setOnRoleAssigned(std::function<void(std::string, int port)>                   cb) { onRoleAssigned_ = std::move(cb); }
+    void setOnError       (std::function<void(std::string msg)>                         cb) { onError_        = std::move(cb); }
 
     static int wsCallback(lws* wsi, lws_callback_reasons reason,
                           void* user, void* in, size_t len);
@@ -66,8 +66,8 @@ private:
     int         gamePort_ = -1;
 
     // Callbacks
-    std::function<void(std::string)>      onRoomCreated_;
-    std::function<void(int)>              onPlayerJoined_;
-    std::function<void(std::string, int)> onRoleAssigned_;
-    std::function<void(std::string)>      onError_;
+    std::function<void(std::string)>                     onRoomCreated_;
+    std::function<void(int, std::string, std::string)>   onPlayerJoined_;
+    std::function<void(std::string, int)>                onRoleAssigned_;
+    std::function<void(std::string)>                     onError_;
 };

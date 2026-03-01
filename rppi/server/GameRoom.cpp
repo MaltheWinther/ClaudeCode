@@ -1,16 +1,20 @@
 #include "GameRoom.hpp"
 #include "GyroPiGame.hpp"
+#include "Leaderboard.hpp"
 
 #include <iostream>
 #include <chrono>
 #include <cstring>
+#include <ctime>
 
 static GameRoom* s_instance = nullptr;
 
 // ── Constructor / Destructor ─────────────────────────────────────────────────
 
-GameRoom::GameRoom(const std::string& roomCode, int port)
-    : roomCode_(roomCode), port_(port)
+GameRoom::GameRoom(const std::string& roomCode, int port,
+                   const std::string& hostName, const std::string& guestName)
+    : roomCode_(roomCode), port_(port),
+      players_(hostName.empty() ? "Unknown" : hostName + " & " + guestName)
 {
     s_instance = this;
 
@@ -115,10 +119,22 @@ void GameRoom::onWritable(lws* wsi) {
 }
 
 void GameRoom::onDisconnect(lws* wsi) {
-    if (wsi == performer_)    performer_    = nullptr;
-    if (wsi == communicator_) communicator_ = nullptr;
+    // Notify the remaining player before cleaning up
+    lws* remaining = nullptr;
+    if (wsi == performer_) {
+        performer_ = nullptr;
+        remaining  = communicator_;
+    } else if (wsi == communicator_) {
+        communicator_ = nullptr;
+        remaining     = performer_;
+    }
+
     writeQueues_.erase(wsi);
-    stop();  // one player disconnected — end the game
+
+    if (remaining)
+        sendTo(remaining, MsgError::build("The other player disconnected"));
+
+    stop();
     std::cout << "[Room " << roomCode_ << "] A player disconnected, shutting down\n";
 }
 
@@ -140,6 +156,7 @@ void GameRoom::handleIdentify(lws* wsi, const json& j) {
 
     // Start game once both players are identified
     if (bothPlayersConnected()) {
+        gameStartTime_ = clock::now();
         game_ = std::make_unique<GyroPiGame>();
         gameThread_ = std::thread(&GameRoom::gameLoopThread, this);
         std::cout << "[Room " << roomCode_ << "] Both players ready — game starting\n";
@@ -212,9 +229,18 @@ void GameRoom::broadcastGameState() {
 
     // Check for game over sentinel
     if (state.ballX < 0) {
-        bool win = game_ && game_->isWon();
-        if (performer_)    sendTo(performer_,    MsgGameOver::build(win));
-        if (communicator_) sendTo(communicator_, MsgGameOver::build(win));
+        int  elapsed = (int)std::chrono::duration<double>(
+                           clock::now() - gameStartTime_).count();
+        int  levels  = game_ ? game_->getState().level : 1;
+        bool win     = game_ && game_->isWon();
+
+        LeaderboardEntry entry{ players_, elapsed, levels, win, currentDate() };
+        Leaderboard::addEntry(entry);
+        auto top = Leaderboard::topN(5);
+
+        auto msg = MsgGameOver::build(win, elapsed, levels, top);
+        if (performer_)    sendTo(performer_,    msg);
+        if (communicator_) sendTo(communicator_, msg);
         stop();
         return;
     }
@@ -235,4 +261,11 @@ void GameRoom::sendTo(lws* wsi, const json& msg) {
     while (!q.empty()) q.pop();  // keep only latest state
     q.push(msg.dump());
     lws_callback_on_writable(wsi);
+}
+
+std::string GameRoom::currentDate() const {
+    std::time_t t = std::time(nullptr);
+    char buf[11];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d", std::localtime(&t));
+    return buf;
 }

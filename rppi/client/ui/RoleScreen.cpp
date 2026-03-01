@@ -26,12 +26,20 @@ RoleScreen::RoleScreen(QWidget* parent) : QWidget(parent) {
     descLabel_->setWordWrap(true);
     descLabel_->setStyleSheet("font-size: 18px; color: #aaa;");
 
+    countdownLabel_ = new QLabel(this);
+    countdownLabel_->setAlignment(Qt::AlignCenter);
+    countdownLabel_->setStyleSheet(
+        "font-size: 120px; font-weight: bold; color: #FFD700;");
+    countdownLabel_->hide();
+
     layout->addStretch();
     layout->addWidget(gameLabel_);
     layout->addSpacing(10);
     layout->addWidget(yourRoleLabel);
     layout->addWidget(roleLabel_);
     layout->addWidget(descLabel_);
+    layout->addSpacing(20);
+    layout->addWidget(countdownLabel_);
     layout->addStretch();
 }
 
@@ -47,6 +55,26 @@ void RoleScreen::setRole(const QString& role, const QString& game) {
         setStyleSheet("background-color: #1a2a0a;");
     }
 
-    // Auto-advance after 2 seconds
-    QTimer::singleShot(2000, this, &RoleScreen::done);
+    // 3-2-1 countdown then emit done()
+    countdown_ = 3;
+    countdownLabel_->setText("3");
+    countdownLabel_->show();
+
+    if (countdownTimer_) {
+        countdownTimer_->stop();
+        countdownTimer_->deleteLater();
+    }
+    countdownTimer_ = new QTimer(this);
+    countdownTimer_->setInterval(1000);
+    connect(countdownTimer_, &QTimer::timeout, this, [this]() {
+        --countdown_;
+        if (countdown_ > 0) {
+            countdownLabel_->setText(QString::number(countdown_));
+        } else {
+            countdownTimer_->stop();
+            countdownLabel_->hide();
+            emit done();
+        }
+    });
+    countdownTimer_->start();
 }

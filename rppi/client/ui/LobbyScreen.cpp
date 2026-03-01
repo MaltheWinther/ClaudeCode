@@ -85,3 +85,31 @@ void LobbyScreen::setPlayerCount(int count) {
         );
     }
 }
+
+void LobbyScreen::setPlayers(int count, const QString& hostName, const QString& guestName) {
+    if (count >= 2) {
+        playerCountLabel_->setText(
+            QString("%1 & %2 (%3/2)").arg(hostName, guestName).arg(count));
+    } else {
+        playerCountLabel_->setText(
+            QString("%1 (1/2)").arg(hostName));
+    }
+
+    if (!isHost_) return;
+
+    if (count >= 2) {
+        statusLabel_->setText("Both players connected! Press PLAY to start.");
+        playBtn_->setEnabled(true);
+        playBtn_->setStyleSheet(
+            "font-size: 28px; background: #4CAF50; color: white;"
+            "border: none; border-radius: 12px;"
+        );
+    } else {
+        statusLabel_->setText("Waiting for another player to join...");
+        playBtn_->setEnabled(false);
+        playBtn_->setStyleSheet(
+            "font-size: 28px; background: #9E9E9E; color: white;"
+            "border: none; border-radius: 12px;"
+        );
+    }
+}

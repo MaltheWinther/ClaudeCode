@@ -26,18 +26,22 @@ private:
     void onWritable(lws* wsi);
 
     // ── Lobby message handlers ───────────────────────────────────────────
-    void handleCreateRoom(lws* wsi);
+    void handleCreateRoom(lws* wsi, const json& j);
     void handleJoinRoom(lws* wsi, const json& j);
     void handleStartGame(lws* wsi);
 
     // ── Helpers ──────────────────────────────────────────────────────────
     void sendTo(lws* wsi, const json& msg);
     std::string generateRoomCode();
-    int spawnGameRoom(const std::string& roomCode);  // returns port
+    int spawnGameRoom(const std::string& roomCode,
+                      const std::string& hostName,
+                      const std::string& guestName);  // returns port
 
     // ── Room state ───────────────────────────────────────────────────────
     struct Room {
         std::string code;
+        std::string hostName;
+        std::string guestName;
         lws* host  = nullptr;   // created the room
         lws* guest = nullptr;   // joined the room
         enum class State { WAITING, FULL, PLAYING } state = State::WAITING;

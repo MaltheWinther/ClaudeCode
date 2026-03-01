@@ -64,7 +64,8 @@ SERVER_SRCS := \
 ROOM_SRCS := \
     server/game_room/main.cpp \
     server/GameRoom.cpp \
-    server/GyroPiGame.cpp
+    server/GyroPiGame.cpp \
+    server/Leaderboard.cpp
 
 CLIENT_SRCS := \
     client/main.cpp \

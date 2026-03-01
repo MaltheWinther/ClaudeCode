@@ -59,6 +59,11 @@ void AppWindow::updateLobbyPlayerCount(int count) {
     lobbyScreen_->setPlayerCount(count);
 }
 
+void AppWindow::updateLobbyPlayers(int count, const QString& hostName,
+                                   const QString& guestName) {
+    lobbyScreen_->setPlayers(count, hostName, guestName);
+}
+
 void AppWindow::setUsernameError(const QString& msg) {
     usernameScreen_->setError(msg);
 }
@@ -82,7 +87,13 @@ void AppWindow::updateGameState(float ballX, float ballY,
     gameScreen_->updateGameState(ballX, ballY, pitch, roll, level);
 }
 
-void AppWindow::showGameOver(bool win) {
-    gameOverScreen_->setResult(win);
+void AppWindow::showGameOver(bool win, int elapsedSecs, int levelsReached,
+                             const std::vector<LeaderboardEntry>& leaderboard) {
+    gameOverScreen_->setResult(win, elapsedSecs, levelsReached, leaderboard);
+    stack_->setCurrentWidget(gameOverScreen_);
+}
+
+void AppWindow::showDisconnect(const QString& msg) {
+    gameOverScreen_->setDisconnect(msg);
     stack_->setCurrentWidget(gameOverScreen_);
 }

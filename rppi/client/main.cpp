@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <string>
+#include <vector>
 
 #include "ui/AppWindow.hpp"
 #include "Credentials.hpp"
@@ -11,14 +12,16 @@
 #include "GyroReader.hpp"
 #include "../common/Messages.hpp"
 
-// Usage: ./client <server_ip>
+// Usage: ./client <server_ip> [username]
+//   Optional username bypasses saved credentials (useful for testing 2 clients on same machine)
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s <server_ip>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <server_ip> [username]\n", argv[0]);
         return 1;
     }
-    const std::string serverIp = argv[1];
+    const std::string serverIp      = argv[1];
+    const std::string cliUsername   = (argc >= 3) ? argv[2] : "";
 
     QApplication app(argc, argv);
     app.setStyle("Fusion");
@@ -43,11 +46,17 @@ int main(int argc, char* argv[]) {
     };
 
     // ── USERNAME PHASE ───────────────────────────────────────────────────────
-    username = Credentials::load();
-    if (username.empty())
-        window.showUsername();
-    else
+    if (!cliUsername.empty()) {
+        // CLI override: skip credential file, go straight to main menu
+        username = cliUsername;
         window.showMainMenu(QString::fromStdString(username));
+    } else {
+        username = Credentials::load();
+        if (username.empty())
+            window.showUsername();
+        else
+            window.showMainMenu(QString::fromStdString(username));
+    }
 
     QObject::connect(&window, &AppWindow::usernameSubmitted,
                      [&](const QString& u) {
@@ -71,10 +80,11 @@ int main(int argc, char* argv[]) {
                 }, Qt::QueuedConnection);
         });
 
-        lobby->setOnPlayerJoined([&window](int count) {
+        lobby->setOnPlayerJoined([&window](int count, std::string h, std::string g) {
             QMetaObject::invokeMethod(&window,
-                [&window, count]() {
-                    window.updateLobbyPlayerCount(count);
+                [&window, count, h = std::move(h), g = std::move(g)]() mutable {
+                    window.updateLobbyPlayers(count,
+                        QString::fromStdString(h), QString::fromStdString(g));
                 }, Qt::QueuedConnection);
         });
 
@@ -145,11 +155,21 @@ int main(int argc, char* argv[]) {
                 }, Qt::QueuedConnection);
         });
 
-        game->setOnGameOver([&window, &gyro](bool win) {
+        game->setOnGameOver([&window, &gyro]
+                            (bool win, int elapsed, int levels,
+                             std::vector<LeaderboardEntry> lb) {
             gyro.stop();
             QMetaObject::invokeMethod(&window,
-                [&window, win]() {
-                    window.showGameOver(win);
+                [&window, win, elapsed, levels, lb = std::move(lb)]() mutable {
+                    window.showGameOver(win, elapsed, levels, lb);
+                }, Qt::QueuedConnection);
+        });
+
+        game->setOnError([&window, &gyro](std::string msg) {
+            gyro.stop();
+            QMetaObject::invokeMethod(&window,
+                [&window, m = std::move(msg)]() mutable {
+                    window.showDisconnect(QString::fromStdString(m));
                 }, Qt::QueuedConnection);
         });
 

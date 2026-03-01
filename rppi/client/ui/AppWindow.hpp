@@ -1,7 +1,9 @@
 #pragma once
 
+#include <vector>
 #include <QMainWindow>
 #include <QStackedWidget>
+#include "../../common/Messages.hpp"
 
 class UsernameScreen;
 class MainMenuScreen;
@@ -21,12 +23,15 @@ public:
     void showLobbyHost(const QString& code, int playerCount);
     void showLobbyGuest(const QString& code);
     void updateLobbyPlayerCount(int count);
+    void updateLobbyPlayers(int count, const QString& hostName, const QString& guestName);
     void setUsernameError(const QString& msg);
     void setMainMenuError(const QString& msg);
     void showRole(const QString& role, const QString& game);
     void showGame(const QString& role);
     void updateGameState(float ballX, float ballY, float pitch, float roll, int level);
-    void showGameOver(bool win);
+    void showGameOver(bool win, int elapsedSecs, int levelsReached,
+                      const std::vector<LeaderboardEntry>& leaderboard);
+    void showDisconnect(const QString& msg);
 
 signals:
     void usernameSubmitted(const QString& username);
