@@ -16,18 +16,18 @@ MOC := $(shell which /opt/homebrew/share/qt/libexec/moc 2>/dev/null \
               || which moc  2>/dev/null \
               || echo moc)
 
+# ── Libraries ─────────────────────────────────────────────────────────────────
+# Homebrew lib/include paths (macOS only — no-op on Linux)
+BREW_PREFIX := $(shell brew --prefix 2>/dev/null)
+BREW_INC    := $(if $(BREW_PREFIX),-I$(BREW_PREFIX)/include)
+BREW_LIB    := $(if $(BREW_PREFIX),-L$(BREW_PREFIX)/lib)
+
 # ── Include paths ─────────────────────────────────────────────────────────────
 INC        := -Icommon -I. $(BREW_INC)
 CLIENT_INC := $(INC) -Iclient
 
 # ── Compile flags ─────────────────────────────────────────────────────────────
 CLIENT_CXXFLAGS := $(CXXFLAGS) $(QT_CFLAGS)
-
-# ── Libraries ─────────────────────────────────────────────────────────────────
-# Homebrew lib/include paths (macOS only — no-op on Linux)
-BREW_PREFIX := $(shell brew --prefix 2>/dev/null)
-BREW_INC    := $(if $(BREW_PREFIX),-I$(BREW_PREFIX)/include)
-BREW_LIB    := $(if $(BREW_PREFIX),-L$(BREW_PREFIX)/lib)
 
 LWS_LIB    := $(BREW_LIB) -lwebsockets
 # BMI160Wrapper is only available on RPi (ecesyshat install); skip on macOS
