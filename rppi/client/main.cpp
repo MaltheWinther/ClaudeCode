@@ -10,6 +10,7 @@
 #include "LobbyClient.hpp"
 #include "GameClient.hpp"
 #include "GyroReader.hpp"
+#include "NoteReader.hpp"
 #include "../common/Messages.hpp"
 
 // Usage: ./client <server_ip> [username]
@@ -34,10 +35,13 @@ int main(int argc, char* argv[]) {
     // ── Application state ────────────────────────────────────────────────────
     std::string  username;
     std::string  role;
+    std::string  gameType;
     int          gamePort  = -1;
+    bool         isHost    = false;
     LobbyClient* lobby     = nullptr;
     GameClient*  game      = nullptr;
     GyroReader   gyro;
+    NoteReader   noteReader;
     std::thread  netThread;
 
     // Join and discard the current network thread (safe after it has stopped)
@@ -88,15 +92,17 @@ int main(int argc, char* argv[]) {
                 }, Qt::QueuedConnection);
         });
 
-        // Write role/gamePort in the Qt main thread to avoid data races
-        lobby->setOnRoleAssigned([&window, &role, &gamePort]
-                                 (std::string r, int port) {
+        // Write role/gamePort/gameType in the Qt main thread to avoid data races
+        lobby->setOnRoleAssigned([&window, &role, &gamePort, &gameType]
+                                 (std::string r, int port, std::string gt) {
             QMetaObject::invokeMethod(&window,
-                [&window, &role, &gamePort, r = std::move(r), port]() mutable {
+                [&window, &role, &gamePort, &gameType,
+                 r = std::move(r), port, gt = std::move(gt)]() mutable {
                     role     = r;
                     gamePort = port;
+                    gameType = gt;  // set from server (important for guest)
                     window.showRole(QString::fromStdString(r),
-                                    QStringLiteral("GyroPi"));
+                                    QString::fromStdString(gameType));
                 }, Qt::QueuedConnection);
         });
 
@@ -111,6 +117,7 @@ int main(int argc, char* argv[]) {
 
     // ── HOST ROOM ────────────────────────────────────────────────────────────
     QObject::connect(&window, &AppWindow::hostRoomClicked, [&]() {
+        isHost = true;
         joinNetThread();
         delete lobby;
         lobby = new LobbyClient(serverIp, 9000);
@@ -122,6 +129,7 @@ int main(int argc, char* argv[]) {
     // ── JOIN ROOM ────────────────────────────────────────────────────────────
     QObject::connect(&window, &AppWindow::joinRoomClicked,
                      [&](const QString& code) {
+        isHost = false;
         joinNetThread();
         delete lobby;
         lobby = new LobbyClient(serverIp, 9000);
@@ -131,21 +139,41 @@ int main(int argc, char* argv[]) {
         netThread = std::thread([lp = lobby] { lp->run(); });
     });
 
-    // ── HOST PRESSES PLAY ────────────────────────────────────────────────────
+    // ── HOST PRESSES PLAY → GAME SELECT SCREEN ──────────────────────────────
     QObject::connect(&window, &AppWindow::startGameClicked, [&]() {
-        if (lobby) lobby->requestStart();
+        window.showGameSelect(isHost);
+    });
+
+    // ── GAME SELECTED (host picks) → SEND START_GAME WITH GAME TYPE ─────────
+    QObject::connect(&window, &AppWindow::gameSelected,
+                     [&](const QString& gt) {
+        gameType = gt.toStdString();
+        if (lobby) lobby->requestStartWithGame(gameType);
     });
 
     // ── ROLE SCREEN AUTO-ADVANCES → START GAME ───────────────────────────────
     QObject::connect(&window, &AppWindow::roleDisplayDone, [&]() {
-        window.showGame(QString::fromStdString(role));
+        if (gameType == "notepi") {
+            window.showNotePiGame(QString::fromStdString(role));
 
-        if (role == Role::PERFORMER) gyro.start();
+            if (role == Role::PERFORMER) {
+                noteReader.setOnNoteDetected([&window](NoteReader::NoteEvent ev) {
+                    QMetaObject::invokeMethod(&window,
+                        [&window, n = std::move(ev.note)]() mutable {
+                            window.addDetectedNote(QString::fromStdString(n));
+                        }, Qt::QueuedConnection);
+                });
+                noteReader.start();
+            }
+        } else {
+            window.showGame(QString::fromStdString(role));
+            if (role == Role::PERFORMER) gyro.start();
+        }
 
         joinNetThread();  // join lobby thread (exits quickly after role assigned)
         delete game;
         game = new GameClient(serverIp, gamePort, role,
-                              (role == Role::PERFORMER) ? &gyro : nullptr);
+                              (gameType != "notepi" && role == Role::PERFORMER) ? &gyro : nullptr);
 
         game->setOnGameState([&window](MsgGameState gs) {
             QMetaObject::invokeMethod(&window,
@@ -155,18 +183,27 @@ int main(int argc, char* argv[]) {
                 }, Qt::QueuedConnection);
         });
 
-        game->setOnGameOver([&window, &gyro]
+        game->setOnNoteState([&window](MsgNoteState ns) {
+            QMetaObject::invokeMethod(&window,
+                [&window, ns = std::move(ns)]() mutable {
+                    window.updateNoteState(ns);
+                }, Qt::QueuedConnection);
+        });
+
+        game->setOnGameOver([&window, &gyro, &noteReader]
                             (bool win, int elapsed, int levels,
                              std::vector<LeaderboardEntry> lb) {
             gyro.stop();
+            noteReader.stop();
             QMetaObject::invokeMethod(&window,
                 [&window, win, elapsed, levels, lb = std::move(lb)]() mutable {
                     window.showGameOver(win, elapsed, levels, lb);
                 }, Qt::QueuedConnection);
         });
 
-        game->setOnError([&window, &gyro](std::string msg) {
+        game->setOnError([&window, &gyro, &noteReader](std::string msg) {
             gyro.stop();
+            noteReader.stop();
             QMetaObject::invokeMethod(&window,
                 [&window, m = std::move(msg)]() mutable {
                     window.showDisconnect(QString::fromStdString(m));
@@ -178,6 +215,20 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             gp->run();
         });
+    });
+
+    // ── NOTEPI: PERFORMER SUBMITS NOTES ──────────────────────────────────────
+    QObject::connect(&window, &AppWindow::notePiNotesSubmitted,
+                     [&](const std::vector<std::string>& notes) {
+        if (game) game->submitNotes(notes);
+    });
+
+    // ── EXIT GAME → STOP EVERYTHING, BACK TO MAIN MENU ─────────────────────
+    QObject::connect(&window, &AppWindow::exitGameClicked, [&]() {
+        gyro.stop();
+        noteReader.stop();
+        if (game) { game->stop(); joinNetThread(); delete game; game = nullptr; }
+        window.showMainMenu(QString::fromStdString(username));
     });
 
     // ── PLAY AGAIN → BACK TO MAIN MENU ───────────────────────────────────────

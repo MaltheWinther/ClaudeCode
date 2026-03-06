@@ -11,12 +11,14 @@
 #include <libwebsockets.h>
 #include "../common/Messages.hpp"
 #include "IGame.hpp"
+#include "NotePiGame.hpp"
 
 class GameRoom {
 public:
     GameRoom(const std::string& roomCode, int port,
              const std::string& hostName = "",
-             const std::string& guestName = "");
+             const std::string& guestName = "",
+             const std::string& gameType = "gyropi");
     ~GameRoom();
 
     void run();   // blocking — lws event loop + game loop thread
@@ -35,6 +37,7 @@ private:
     // ── Game message handlers ────────────────────────────────────────────
     void handleIdentify(lws* wsi, const json& j);
     void handleGyroData(lws* wsi, const json& j);
+    void handleNoteSubmit(lws* wsi, const json& j);
 
     // ── Game loop (runs in separate thread) ──────────────────────────────
     void gameLoopThread();
@@ -49,6 +52,7 @@ private:
     std::string  roomCode_;
     int          port_;
     std::string  players_;    // "Host & Guest" for leaderboard
+    std::string  gameType_;   // "gyropi" or "notepi"
     bool         running_    = false;
     lws_context* context_    = nullptr;
 
@@ -68,7 +72,8 @@ private:
     std::atomic<bool> stateDirty_{ false };
     std::mutex   stateMutex_;
 
-    std::unique_ptr<IGame> game_;
+    std::unique_ptr<IGame> game_;          // GyroPi only
+    std::unique_ptr<NotePiGame> notePi_;   // NotePi only
     std::thread gameThread_;
 
     std::map<lws*, std::queue<std::string>> writeQueues_;

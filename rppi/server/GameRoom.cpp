@@ -12,9 +12,11 @@ static GameRoom* s_instance = nullptr;
 // ── Constructor / Destructor ─────────────────────────────────────────────────
 
 GameRoom::GameRoom(const std::string& roomCode, int port,
-                   const std::string& hostName, const std::string& guestName)
+                   const std::string& hostName, const std::string& guestName,
+                   const std::string& gameType)
     : roomCode_(roomCode), port_(port),
-      players_(hostName.empty() ? "Unknown" : hostName + " & " + guestName)
+      players_(hostName.empty() ? "Unknown" : hostName + " & " + guestName),
+      gameType_(gameType)
 {
     s_instance = this;
 
@@ -99,8 +101,9 @@ void GameRoom::onMessage(lws* wsi, const std::string& raw) {
 
     const json j = json::parse(raw);
 
-    if      (type == MsgType::IDENTIFY)  handleIdentify(wsi, j);
-    else if (type == MsgType::GYRO_DATA) handleGyroData(wsi, j);
+    if      (type == MsgType::IDENTIFY)    handleIdentify(wsi, j);
+    else if (type == MsgType::GYRO_DATA)  handleGyroData(wsi, j);
+    else if (type == MsgType::NOTE_SUBMIT) handleNoteSubmit(wsi, j);
     else    sendTo(wsi, MsgError::build("Unknown message type in game: " + type));
 }
 
@@ -161,9 +164,14 @@ void GameRoom::handleIdentify(lws* wsi, const json& j) {
     // Start game once both players are identified
     if (bothPlayersConnected()) {
         gameStartTime_ = clock::now();
-        game_ = std::make_unique<GyroPiGame>();
-        gameThread_ = std::thread(&GameRoom::gameLoopThread, this);
-        std::cout << "[Room " << roomCode_ << "] Both players ready — game starting\n";
+        if (gameType_ == "notepi") {
+            notePi_ = std::make_unique<NotePiGame>();
+            std::cout << "[Room " << roomCode_ << "] Both players ready — NotePi starting\n";
+        } else {
+            game_ = std::make_unique<GyroPiGame>();
+            gameThread_ = std::thread(&GameRoom::gameLoopThread, this);
+            std::cout << "[Room " << roomCode_ << "] Both players ready — GyroPi starting\n";
+        }
     }
 }
 
@@ -174,6 +182,41 @@ void GameRoom::handleGyroData(lws* wsi, const json& j) {
     std::lock_guard<std::mutex> lock(gyroMutex_);
     gyro_.pitch = msg.pitch;
     gyro_.roll  = msg.roll;
+}
+
+void GameRoom::handleNoteSubmit(lws* wsi, const json& j) {
+    if (wsi != performer_) return;
+    if (!notePi_ || notePi_->isFinished()) return;
+
+    auto msg = MsgNoteSubmit::parse(j);
+    if ((int)msg.notes.size() != 5) {
+        sendTo(wsi, MsgError::build("Must submit exactly 5 notes"));
+        return;
+    }
+
+    auto result = notePi_->submitGuess(msg.notes);
+
+    auto stateMsg = MsgNoteState::build(
+        notePi_->attemptCount(), msg.notes, result.colors,
+        result.correct, notePi_->history());
+
+    if (performer_)    sendTo(performer_,    stateMsg);
+    if (communicator_) sendTo(communicator_, stateMsg);
+
+    if (result.correct) {
+        int elapsed = (int)std::chrono::duration<double>(
+                          clock::now() - gameStartTime_).count();
+        int attempts = notePi_->attemptCount();
+
+        LeaderboardEntry entry{ players_, elapsed, attempts, true, currentDate() };
+        Leaderboard::addEntry(entry);
+        auto top = Leaderboard::topN(5);
+
+        auto overMsg = MsgGameOver::build(true, elapsed, attempts, top);
+        if (performer_)    sendTo(performer_,    overMsg);
+        if (communicator_) sendTo(communicator_, overMsg);
+        stop();
+    }
 }
 
 // ── Game loop ────────────────────────────────────────────────────────────────

@@ -35,6 +35,11 @@ GameClient::~GameClient() {
     if (context_) lws_context_destroy(context_);
 }
 
+void GameClient::stop() {
+    running_ = false;
+    if (context_) lws_cancel_service(context_);
+}
+
 void GameClient::run() {
     lws_client_connect_info ccinfo{};
     ccinfo.context  = context_;
@@ -71,6 +76,9 @@ int GameClient::wsCallback(lws* wsi, lws_callback_reasons reason,
             s_game->wsi_     = nullptr;
             s_game->running_ = false;
             break;
+        case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
+            s_game->onWaitCancelled();
+            break;
         case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
             s_game->onError();
             break;
@@ -104,6 +112,9 @@ void GameClient::onMessage(const std::string& raw) {
             onGameOver_(msg.win, msg.elapsedSecs, msg.levelsReached, msg.leaderboard);
         running_ = false;
 
+    } else if (type == MsgType::NOTE_STATE) {
+        if (onNoteState_) onNoteState_(MsgNoteState::parse(j));
+
     } else if (type == MsgType::ERROR) {
         auto errMsg = MsgError::parse(j).message;
         std::cerr << "[Game] Error: " << errMsg << "\n";
@@ -113,6 +124,7 @@ void GameClient::onMessage(const std::string& raw) {
 }
 
 void GameClient::onWritable(lws* wsi) {
+    std::lock_guard<std::mutex> lk(queueMutex_);
     if (outQueue_.empty()) return;
 
     const std::string& msg = outQueue_.front();
@@ -122,6 +134,11 @@ void GameClient::onWritable(lws* wsi) {
     outQueue_.pop();
 
     if (!outQueue_.empty()) lws_callback_on_writable(wsi);
+}
+
+void GameClient::onWaitCancelled() {
+    if (pendingWake_.exchange(false) && wsi_)
+        lws_callback_on_writable(wsi_);
 }
 
 void GameClient::onError() {
@@ -142,6 +159,17 @@ void GameClient::sendGyroIfDue() {
     lws_callback_on_writable(wsi_);
 }
 
+void GameClient::submitNotes(const std::vector<std::string>& notes) {
+    if (!wsi_) return;
+    {
+        std::lock_guard<std::mutex> lk(queueMutex_);
+        outQueue_.push(MsgNoteSubmit::build(notes).dump());
+        pendingWake_ = true;
+    }
+    lws_cancel_service(context_);  // thread-safe — wakes lws_service()
+}
+
 void GameClient::enqueue(const json& msg) {
+    std::lock_guard<std::mutex> lk(queueMutex_);
     outQueue_.push(msg.dump());
 }

@@ -2,6 +2,8 @@
 
 #include <string>
 #include <queue>
+#include <mutex>
+#include <atomic>
 #include <functional>
 #include <libwebsockets.h>
 #include "../common/Messages.hpp"
@@ -21,11 +23,15 @@ public:
                GyroReader* gyro);    // nullptr for communicator
     ~GameClient();
 
-    void run();  // blocking — returns when game is over
+    void run();   // blocking — returns when game is over
+    void stop();  // signal run() to exit
 
     void setOnGameState(std::function<void(MsgGameState)>                                          cb) { onGameState_ = std::move(cb); }
     void setOnGameOver (std::function<void(bool, int, int, std::vector<LeaderboardEntry>)>         cb) { onGameOver_  = std::move(cb); }
+    void setOnNoteState(std::function<void(MsgNoteState)>                                          cb) { onNoteState_ = std::move(cb); }
     void setOnError    (std::function<void(std::string)>                                           cb) { onError_cb_  = std::move(cb); }
+
+    void submitNotes(const std::vector<std::string>& notes);
 
     static int wsCallback(lws* wsi, lws_callback_reasons reason,
                           void* user, void* in, size_t len);
@@ -33,6 +39,7 @@ private:
     void onConnect(lws* wsi);
     void onMessage(const std::string& raw);
     void onWritable(lws* wsi);
+    void onWaitCancelled();
     void onError();
     void sendGyroIfDue();
     void enqueue(const json& msg);
@@ -46,10 +53,13 @@ private:
     lws_context* context_  = nullptr;
     lws*         wsi_      = nullptr;
 
+    std::mutex              queueMutex_;
+    std::atomic<bool>       pendingWake_{false};
     std::queue<std::string> outQueue_;
 
     std::function<void(MsgGameState)>                                  onGameState_;
     std::function<void(bool, int, int, std::vector<LeaderboardEntry>)> onGameOver_;
+    std::function<void(MsgNoteState)>                                  onNoteState_;
     std::function<void(std::string)>                                   onError_cb_;
 
     double lastGyroSendMs_ = 0.0;

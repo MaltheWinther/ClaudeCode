@@ -25,7 +25,7 @@ GameOverScreen::GameOverScreen(QWidget* parent) : QWidget(parent) {
     leaderboardLayout_->setContentsMargins(24, 16, 24, 16);
     leaderboardWidget_->hide();
 
-    auto* playAgainBtn = new QPushButton("PLAY AGAIN", this);
+    auto* playAgainBtn = new QPushButton("GO BACK TO MAIN MENU", this);
     playAgainBtn->setFixedWidth(300);
     playAgainBtn->setFixedHeight(60);
     playAgainBtn->setStyleSheet(
@@ -33,7 +33,7 @@ GameOverScreen::GameOverScreen(QWidget* parent) : QWidget(parent) {
         "border: none; border-radius: 10px;"
     );
 
-    auto* exitBtn = new QPushButton("EXIT", this);
+    auto* exitBtn = new QPushButton("EXIT PROGRAM", this);
     exitBtn->setFixedWidth(300);
     exitBtn->setFixedHeight(50);
     exitBtn->setStyleSheet(

@@ -22,9 +22,9 @@ LobbyServer::LobbyServer(int port) : port_(port) {
     lws_context_creation_info info{};
     info.port      = port_;
     info.protocols = protocols;
-    info.options   = LWS_SERVER_OPTION_VALIDATE_UTF8;
+    info.options   = LWS_SERVER_OPTION_VALIDATE_UTF8; //Tjekker at beskeden fra klienten sender gyldig tekst. Hvis ikke, så dropper vi forbindelsen.
 
-    context_ = lws_create_context(&info);
+    context_ = lws_create_context(&info); //Starter serveren og giver den information fra vores info-struct.
     if (!context_)
         throw std::runtime_error("Failed to create libwebsockets context");
 
@@ -49,11 +49,13 @@ void LobbyServer::stop() {
 
 // ── Static lws callback — forwards to instance ──────────────────────────────
 
+// lws* wsi = en pointer til den klient der 
+
 int LobbyServer::wsCallback(lws* wsi, lws_callback_reasons reason,
                              void* /*user*/, void* in, size_t len) {
     if (!s_instance) return 0;
 
-    switch (reason) {
+    switch (reason) { // fortsæt her
         case LWS_CALLBACK_ESTABLISHED:
             s_instance->onConnect(wsi);
             break;
@@ -95,7 +97,7 @@ void LobbyServer::onMessage(lws* wsi, const std::string& raw) {
     const json j = json::parse(raw);
     if      (type == MsgType::CREATE_ROOM) handleCreateRoom(wsi, j);
     else if (type == MsgType::JOIN_ROOM)   handleJoinRoom(wsi, j);
-    else if (type == MsgType::START_GAME)  handleStartGame(wsi);
+    else if (type == MsgType::START_GAME)  handleStartGame(wsi, j);
     else    sendTo(wsi, MsgError::build("Unknown message type: " + type));
 }
 
@@ -185,7 +187,7 @@ void LobbyServer::handleJoinRoom(lws* wsi, const json& j) {
               << room.hostName << " & " << guestName << ")\n";
 }
 
-void LobbyServer::handleStartGame(lws* wsi) {
+void LobbyServer::handleStartGame(lws* wsi, const json& j) {
     auto it = clientRooms_.find(wsi);
     if (it == clientRooms_.end()) {
         sendTo(wsi, MsgError::build("Not in a room"));
@@ -200,6 +202,8 @@ void LobbyServer::handleStartGame(lws* wsi) {
 
     room.state = Room::State::PLAYING;
 
+    std::string gameType = j.value("game", "gyropi");
+
     // Randomly assign roles
     std::mt19937 rng(std::random_device{}());
     bool hostIsPerformer = std::uniform_int_distribution<>(0, 1)(rng);
@@ -207,12 +211,12 @@ void LobbyServer::handleStartGame(lws* wsi) {
     lws* performer   = hostIsPerformer ? room.host : room.guest;
     lws* communicator = hostIsPerformer ? room.guest : room.host;
 
-    int gamePort = spawnGameRoom(room.code, room.hostName, room.guestName);
+    int gamePort = spawnGameRoom(room.code, room.hostName, room.guestName, gameType);
 
-    sendTo(performer,    MsgRoleAssigned::build(Role::PERFORMER,    gamePort));
-    sendTo(communicator, MsgRoleAssigned::build(Role::COMMUNICATOR, gamePort));
+    sendTo(performer,    MsgRoleAssigned::build(Role::PERFORMER,    gamePort, gameType));
+    sendTo(communicator, MsgRoleAssigned::build(Role::COMMUNICATOR, gamePort, gameType));
 
-    std::cout << "[Lobby] Game started for room " << room.code
+    std::cout << "[Lobby] " << gameType << " started for room " << room.code
               << " on port " << gamePort << "\n";
 }
 
@@ -238,7 +242,8 @@ std::string LobbyServer::generateRoomCode() {
 
 int LobbyServer::spawnGameRoom(const std::string& roomCode,
                                const std::string& hostName,
-                               const std::string& guestName) {
+                               const std::string& guestName,
+                               const std::string& gameType) {
     int port = nextGamePort_++;
 
     pid_t pid = fork();
@@ -249,6 +254,7 @@ int LobbyServer::spawnGameRoom(const std::string& roomCode,
               std::to_string(port).c_str(),
               hostName.c_str(),
               guestName.c_str(),
+              gameType.c_str(),
               nullptr);
         std::cerr << "[Lobby] execl failed\n";
         _exit(1);

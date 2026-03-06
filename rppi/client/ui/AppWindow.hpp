@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string>
 #include <QMainWindow>
 #include <QStackedWidget>
 #include "../../common/Messages.hpp"
@@ -8,8 +9,10 @@
 class UsernameScreen;
 class MainMenuScreen;
 class LobbyScreen;
+class GameSelectScreen;
 class RoleScreen;
 class GameScreen;
+class NotePiScreen;
 class GameOverScreen;
 
 class AppWindow : public QMainWindow {
@@ -26,8 +29,12 @@ public:
     void updateLobbyPlayers(int count, const QString& hostName, const QString& guestName);
     void setUsernameError(const QString& msg);
     void setMainMenuError(const QString& msg);
+    void showGameSelect(bool isHost);
     void showRole(const QString& role, const QString& game);
     void showGame(const QString& role);
+    void showNotePiGame(const QString& role);
+    void addDetectedNote(const QString& note);
+    void updateNoteState(const MsgNoteState& state);
     void updateGameState(float ballX, float ballY, float pitch, float roll, int level);
     void showGameOver(bool win, int elapsedSecs, int levelsReached,
                       const std::vector<LeaderboardEntry>& leaderboard);
@@ -38,15 +45,20 @@ signals:
     void hostRoomClicked();
     void joinRoomClicked(const QString& code);
     void startGameClicked();
+    void gameSelected(const QString& gameType);
     void roleDisplayDone();
+    void notePiNotesSubmitted(const std::vector<std::string>& notes);
     void playAgainClicked();
+    void exitGameClicked();
 
 private:
-    QStackedWidget* stack_;
-    UsernameScreen* usernameScreen_;
-    MainMenuScreen* mainMenuScreen_;
-    LobbyScreen*    lobbyScreen_;
-    RoleScreen*     roleScreen_;
-    GameScreen*     gameScreen_;
-    GameOverScreen* gameOverScreen_;
+    QStackedWidget*  stack_;
+    UsernameScreen*  usernameScreen_;
+    MainMenuScreen*  mainMenuScreen_;
+    LobbyScreen*     lobbyScreen_;
+    GameSelectScreen* gameSelectScreen_;
+    RoleScreen*      roleScreen_;
+    GameScreen*      gameScreen_;
+    NotePiScreen*    notePiScreen_;
+    GameOverScreen*  gameOverScreen_;
 };

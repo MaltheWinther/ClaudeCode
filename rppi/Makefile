@@ -33,6 +33,13 @@ LWS_LIB    := $(BREW_LIB) -lwebsockets
 # BMI160Wrapper is only available on RPi (ecesyshat install); skip on macOS
 UNAME := $(shell uname)
 BMI_LIB    := $(if $(filter Linux,$(UNAME)),-lBMI160Wrapper)
+ifeq ($(UNAME),Linux)
+  AUBIO_LIB := -laubio -lasound
+else ifeq ($(UNAME),Darwin)
+  AUBIO_LIB := $(shell pkg-config --libs aubio 2>/dev/null || echo -laubio) -framework AudioToolbox
+else
+  AUBIO_LIB :=
+endif
 THREAD_LIB := -lpthread
 
 # ── Output directories ────────────────────────────────────────────────────────
@@ -46,8 +53,10 @@ MOC_HEADERS := \
     client/ui/UsernameScreen.hpp \
     client/ui/MainMenuScreen.hpp \
     client/ui/LobbyScreen.hpp \
+    client/ui/GameSelectScreen.hpp \
     client/ui/RoleScreen.hpp \
     client/ui/GameScreen.hpp \
+    client/ui/NotePiScreen.hpp \
     client/ui/GameOverScreen.hpp
 
 MOC_SRCS := $(MOC_HEADERS:%.hpp=%.moc.cpp)
@@ -65,6 +74,7 @@ ROOM_SRCS := \
     server/game_room/main.cpp \
     server/GameRoom.cpp \
     server/GyroPiGame.cpp \
+    server/NotePiGame.cpp \
     server/Leaderboard.cpp
 
 CLIENT_SRCS := \
@@ -72,13 +82,16 @@ CLIENT_SRCS := \
     client/LobbyClient.cpp \
     client/GameClient.cpp \
     client/GyroReader.cpp \
+    client/NoteReader.cpp \
     client/Credentials.cpp \
     client/ui/AppWindow.cpp \
     client/ui/UsernameScreen.cpp \
     client/ui/MainMenuScreen.cpp \
     client/ui/LobbyScreen.cpp \
+    client/ui/GameSelectScreen.cpp \
     client/ui/RoleScreen.cpp \
     client/ui/GameScreen.cpp \
+    client/ui/NotePiScreen.cpp \
     client/ui/GameOverScreen.cpp \
     $(MOC_SRCS)
 
@@ -106,7 +119,7 @@ client: $(BINDIR)/client
 
 $(BINDIR)/client: $(CLIENT_OBJS)
 	$(CXX) $(CLIENT_CXXFLAGS) -o $@ $^ \
-	    $(LWS_LIB) $(BMI_LIB) $(THREAD_LIB) $(QT_LIBS)
+	    $(LWS_LIB) $(BMI_LIB) $(AUBIO_LIB) $(THREAD_LIB) $(QT_LIBS)
 
 # ── Compile rules ─────────────────────────────────────────────────────────────
 # Client rule (Qt flags) — more specific, matched before the generic rule below

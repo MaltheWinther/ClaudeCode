@@ -64,6 +64,15 @@ void LobbyClient::requestStart() {
     lws_cancel_service(context_);  // thread-safe — wakes lws_service()
 }
 
+void LobbyClient::requestStartWithGame(const std::string& gameType) {
+    {
+        std::lock_guard<std::mutex> lk(queueMutex_);
+        outQueue_.push(MsgStartGame::build(gameType).dump());
+        pendingWake_ = true;
+    }
+    lws_cancel_service(context_);
+}
+
 // ── Static lws callback ───────────────────────────────────────────────────────
 
 int LobbyClient::wsCallback(lws* wsi, lws_callback_reasons reason,
@@ -132,8 +141,9 @@ void LobbyClient::onMessage(const std::string& raw) {
         auto msg  = MsgRoleAssigned::parse(j);
         role_     = msg.role;
         gamePort_ = msg.gamePort;
-        std::cout << "[Lobby] Role: " << role_ << " — game port " << gamePort_ << "\n";
-        if (onRoleAssigned_) onRoleAssigned_(role_, gamePort_);
+        std::cout << "[Lobby] Role: " << role_ << " — game port " << gamePort_
+                  << " — game " << msg.game << "\n";
+        if (onRoleAssigned_) onRoleAssigned_(role_, gamePort_, msg.game);
         running_ = false;
 
     } else if (type == MsgType::ERROR) {

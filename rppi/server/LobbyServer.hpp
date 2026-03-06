@@ -28,14 +28,15 @@ private:
     // ── Lobby message handlers ───────────────────────────────────────────
     void handleCreateRoom(lws* wsi, const json& j);
     void handleJoinRoom(lws* wsi, const json& j);
-    void handleStartGame(lws* wsi);
+    void handleStartGame(lws* wsi, const json& j);
 
     // ── Helpers ──────────────────────────────────────────────────────────
     void sendTo(lws* wsi, const json& msg);
     std::string generateRoomCode();
     int spawnGameRoom(const std::string& roomCode,
                       const std::string& hostName,
-                      const std::string& guestName);  // returns port
+                      const std::string& guestName,
+                      const std::string& gameType);  // returns port
 
     // ── Room state ───────────────────────────────────────────────────────
     struct Room {

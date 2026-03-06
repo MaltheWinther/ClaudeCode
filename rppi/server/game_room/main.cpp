@@ -11,10 +11,10 @@ static void onSignal(int /*sig*/) {
 }
 
 // Called by LobbyServer via:
-//   execl("./game_room", "game_room", roomCode, port, hostName, guestName, nullptr)
+//   execl("./game_room", "game_room", roomCode, port, hostName, guestName, gameType, nullptr)
 int main(int argc, char* argv[]) {
-    if (argc != 5) {
-        std::cerr << "Usage: game_room <room_code> <port> <host_name> <guest_name>\n";
+    if (argc < 5 || argc > 6) {
+        std::cerr << "Usage: game_room <room_code> <port> <host_name> <guest_name> [game_type]\n";
         return 1;
     }
 
@@ -22,12 +22,13 @@ int main(int argc, char* argv[]) {
     const int         port      = std::atoi(argv[2]);
     const std::string hostName  = argv[3];
     const std::string guestName = argv[4];
+    const std::string gameType  = (argc >= 6) ? argv[5] : "gyropi";
 
     std::signal(SIGINT,  onSignal);
     std::signal(SIGTERM, onSignal);
 
     try {
-        GameRoom room(roomCode, port, hostName, guestName);
+        GameRoom room(roomCode, port, hostName, guestName, gameType);
         g_room = &room;
         room.run();
     } catch (const std::exception& e) {

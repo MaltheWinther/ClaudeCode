@@ -5,6 +5,7 @@
 #include <QRadialGradient>
 #include <QFont>
 #include <QTimer>
+#include <QPushButton>
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -57,6 +58,15 @@ static const std::vector<LevelData> s_levels = {
 
 GameScreen::GameScreen(QWidget* parent) : QWidget(parent) {
     setStyleSheet("background-color: #111;");
+
+    auto* exitBtn = new QPushButton("EXIT", this);
+    exitBtn->setFixedSize(80, 36);
+    exitBtn->move(10, 10);
+    exitBtn->setStyleSheet(
+        "font-size: 14px; background: #F44336; color: white;"
+        "border: none; border-radius: 6px;");
+    exitBtn->raise();
+    connect(exitBtn, &QPushButton::clicked, this, &GameScreen::exitGame);
 }
 
 void GameScreen::setRole(const QString& role) {

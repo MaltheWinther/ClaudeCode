@@ -11,6 +11,9 @@ public:
 
     void setRole(const QString& role);
 
+signals:
+    void exitGame();
+
 public slots:
     void updateGameState(float ballX, float ballY, float pitch, float roll, int level);
 

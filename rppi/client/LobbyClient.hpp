@@ -26,6 +26,7 @@ public:
     void joinRoom(const std::string& code, const std::string& username);
     void run();          // blocking — call from a background thread
     void requestStart(); // thread-safe — sends START_GAME from any thread
+    void requestStartWithGame(const std::string& gameType); // sends START_GAME with game type
 
     std::string getRoomCode() const { return roomCode_; }
     std::string getRole()     const { return role_; }
@@ -34,7 +35,7 @@ public:
     // Callbacks (set before calling run())
     void setOnRoomCreated (std::function<void(std::string code)>                        cb) { onRoomCreated_  = std::move(cb); }
     void setOnPlayerJoined(std::function<void(int, std::string, std::string)>           cb) { onPlayerJoined_ = std::move(cb); }
-    void setOnRoleAssigned(std::function<void(std::string, int port)>                   cb) { onRoleAssigned_ = std::move(cb); }
+    void setOnRoleAssigned(std::function<void(std::string, int port, std::string game)> cb) { onRoleAssigned_ = std::move(cb); }
     void setOnError       (std::function<void(std::string msg)>                         cb) { onError_        = std::move(cb); }
 
     static int wsCallback(lws* wsi, lws_callback_reasons reason,
@@ -68,6 +69,6 @@ private:
     // Callbacks
     std::function<void(std::string)>                     onRoomCreated_;
     std::function<void(int, std::string, std::string)>   onPlayerJoined_;
-    std::function<void(std::string, int)>                onRoleAssigned_;
+    std::function<void(std::string, int, std::string)>   onRoleAssigned_;
     std::function<void(std::string)>                     onError_;
 };

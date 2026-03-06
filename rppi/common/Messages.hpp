@@ -18,6 +18,7 @@ namespace MsgType {
     // Client → Server (Game)
     constexpr auto IDENTIFY     = "identify";   // first msg sent to GameRoom
     constexpr auto GYRO_DATA    = "gyro_data";
+    constexpr auto NOTE_SUBMIT  = "note_submit";  // performer submits 5-note guess
 
     // Server → Client (Lobby)
     constexpr auto ROOM_CREATED  = "room_created";
@@ -29,6 +30,7 @@ namespace MsgType {
     // Server → Client (Game)
     constexpr auto GAME_STATE   = "game_state";
     constexpr auto GAME_OVER    = "game_over";
+    constexpr auto NOTE_STATE   = "note_state";   // Wordle feedback for NotePi
 }
 
 // ─────────────────────────────────────────────
@@ -76,8 +78,10 @@ struct MsgJoinRoom {
 };
 
 struct MsgStartGame {
-    static json build() {
-        return { {"type", MsgType::START_GAME} };
+    static json build(const std::string& game = "") {
+        json j = { {"type", MsgType::START_GAME} };
+        if (!game.empty()) j["game"] = game;
+        return j;
     }
 };
 
@@ -149,12 +153,17 @@ struct MsgPlayerJoined {
 struct MsgRoleAssigned {
     std::string role;  // Role::PERFORMER or Role::COMMUNICATOR
     int gamePort;      // port the GameRoom process is listening on
+    std::string game;  // "gyropi" or "notepi"
 
-    static json build(const std::string& role, int gamePort) {
-        return { {"type", MsgType::ROLE_ASSIGNED}, {"role", role}, {"game_port", gamePort} };
+    static json build(const std::string& role, int gamePort,
+                      const std::string& game = "gyropi") {
+        return { {"type", MsgType::ROLE_ASSIGNED}, {"role", role},
+                 {"game_port", gamePort}, {"game", game} };
     }
     static MsgRoleAssigned parse(const json& j) {
-        return { j.at("role").get<std::string>(), j.at("game_port").get<int>() };
+        return { j.at("role").get<std::string>(),
+                 j.at("game_port").get<int>(),
+                 j.value("game", "gyropi") };
     }
 };
 
@@ -233,6 +242,62 @@ struct MsgGameOver {
                     e.value("levels_reached", 1),
                     e.value("won",            false),
                     e.value("date",           "")
+                });
+            }
+        }
+        return msg;
+    }
+};
+
+// ─────────────────────────────────────────────
+//  NotePi messages
+// ─────────────────────────────────────────────
+
+struct MsgNoteSubmit {
+    std::vector<std::string> notes;
+
+    static json build(const std::vector<std::string>& notes) {
+        return { {"type", MsgType::NOTE_SUBMIT}, {"notes", notes} };
+    }
+    static MsgNoteSubmit parse(const json& j) {
+        return { j.at("notes").get<std::vector<std::string>>() };
+    }
+};
+
+struct NoteAttempt {
+    std::vector<std::string> notes;
+    std::vector<std::string> colors;  // "green", "yellow", "red"
+};
+
+struct MsgNoteState {
+    int attempt;
+    std::vector<std::string> notes;
+    std::vector<std::string> colors;
+    bool correct;
+    std::vector<NoteAttempt> history;
+
+    static json build(int attempt, const std::vector<std::string>& notes,
+                      const std::vector<std::string>& colors, bool correct,
+                      const std::vector<NoteAttempt>& history) {
+        json histArr = json::array();
+        for (const auto& h : history) {
+            histArr.push_back({{"notes", h.notes}, {"colors", h.colors}});
+        }
+        return { {"type", MsgType::NOTE_STATE}, {"attempt", attempt},
+                 {"notes", notes}, {"colors", colors},
+                 {"correct", correct}, {"history", histArr} };
+    }
+    static MsgNoteState parse(const json& j) {
+        MsgNoteState msg;
+        msg.attempt = j.at("attempt").get<int>();
+        msg.notes   = j.at("notes").get<std::vector<std::string>>();
+        msg.colors  = j.at("colors").get<std::vector<std::string>>();
+        msg.correct = j.at("correct").get<bool>();
+        if (j.contains("history")) {
+            for (const auto& h : j.at("history")) {
+                msg.history.push_back({
+                    h.at("notes").get<std::vector<std::string>>(),
+                    h.at("colors").get<std::vector<std::string>>()
                 });
             }
         }

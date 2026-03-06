@@ -1,0 +1,424 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36" version="29.6.0">
+  <diagram name="Page-1" id="FHOSr1jL6FpIiqEDmdAt">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;align=center;strokeColor=none;fillColor=none;fontSize=16;fontStyle=1;" value="Domain Model - Ready Player Pi" vertex="1">
+          <mxGeometry height="30" width="500" x="500" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="Player" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«actor»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Player&lt;/b&gt;" vertex="1">
+          <mxGeometry height="66" width="170" x="640" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="Player_a1" parent="Player" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="username" vertex="1">
+          <mxGeometry height="26" width="170" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="GuestPlayer" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«actor»&lt;/i&gt;&lt;br&gt;&lt;b&gt;GuestPlayer&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="170" x="910" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="GameController" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«boundary»&lt;/i&gt;&lt;br&gt;&lt;b&gt;GameController&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="195" x="205" y="63" as="geometry" />
+        </mxCell>
+        <mxCell id="Gyroscope" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«boundary»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Gyroscope&lt;/b&gt;" vertex="1">
+          <mxGeometry height="92" width="170" x="-10" y="37" as="geometry" />
+        </mxCell>
+        <mxCell id="Gyro_a1" parent="Gyroscope" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="tiltX" vertex="1">
+          <mxGeometry height="26" width="170" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Gyro_a2" parent="Gyroscope" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="tiltY" vertex="1">
+          <mxGeometry height="26" width="170" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="Display" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«boundary»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Display&lt;/b&gt;" vertex="1">
+          <mxGeometry height="66" width="155" x="305" y="306" as="geometry" />
+        </mxCell>
+        <mxCell id="Disp_a1" parent="Display" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="resolution" vertex="1">
+          <mxGeometry height="26" width="155" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Microphone" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«boundary»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Microphone&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="170" x="110" y="306" as="geometry" />
+        </mxCell>
+        <mxCell id="Server" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Server&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="150" x="1050" y="363" as="geometry" />
+        </mxCell>
+        <mxCell id="GameRoom" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;GameRoom&lt;/b&gt;" vertex="1">
+          <mxGeometry height="66" width="170" x="750" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="GR_a1" parent="GameRoom" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="roomCode" vertex="1">
+          <mxGeometry height="26" width="170" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Game" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;&lt;i&gt;Game&lt;/i&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="160" x="490" y="363" as="geometry" />
+        </mxCell>
+        <mxCell id="GyroPi" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;GyroPi&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="150" x="160" y="424" as="geometry" />
+        </mxCell>
+        <mxCell id="NotePi" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;NotePi&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="150" x="495" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="Scoreboard" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Scoreboard&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="170" x="1040" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="GameScore" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;GameScore&lt;/b&gt;" vertex="1">
+          <mxGeometry height="118" width="185" x="735" y="471" as="geometry" />
+        </mxCell>
+        <mxCell id="GS_a1" parent="GameScore" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="score" vertex="1">
+          <mxGeometry height="26" width="185" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="GS_a2" parent="GameScore" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="timestamp" vertex="1">
+          <mxGeometry height="26" width="185" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="GS_a3" parent="GameScore" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="playerName" vertex="1">
+          <mxGeometry height="26" width="185" y="92" as="geometry" />
+        </mxCell>
+        <mxCell id="Course" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Course&lt;/b&gt;" vertex="1">
+          <mxGeometry height="66" width="175" x="60" y="594" as="geometry" />
+        </mxCell>
+        <mxCell id="Course_a1" parent="Course" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="startingPoint" vertex="1">
+          <mxGeometry height="26" width="175" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Ball" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Ball&lt;/b&gt;" vertex="1">
+          <mxGeometry height="66" width="145" x="-90" y="774" as="geometry" />
+        </mxCell>
+        <mxCell id="Ball_a1" parent="Ball" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="position" vertex="1">
+          <mxGeometry height="26" width="145" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="GoalArea" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;GoalArea&lt;/b&gt;" vertex="1">
+          <mxGeometry height="66" width="160" x="90" y="774" as="geometry" />
+        </mxCell>
+        <mxCell id="GoalArea_a1" parent="GoalArea" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="position" vertex="1">
+          <mxGeometry height="26" width="160" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="BlackHole" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;BlackHole&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="155" x="310" y="607" as="geometry" />
+        </mxCell>
+        <mxCell id="SecretSequence" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;SecretSequence&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="195" x="405" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="Attempt" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Attempt&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="155" x="675" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="NoteSequence" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;NoteSequence&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="180" x="545" y="880" as="geometry" />
+        </mxCell>
+        <mxCell id="Note" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;Note&lt;/b&gt;" vertex="1">
+          <mxGeometry height="66" width="145" x="425" y="1020" as="geometry" />
+        </mxCell>
+        <mxCell id="Note_a1" parent="Note" style="text;strokeColor=none;fillColor=none;align=left;spacingLeft=4;verticalAlign=top;" value="pitch" vertex="1">
+          <mxGeometry height="26" width="145" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="NoteFeedback" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«domain»&lt;/i&gt;&lt;br&gt;&lt;b&gt;NoteFeedback&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="180" x="775" y="880" as="geometry" />
+        </mxCell>
+        <mxCell id="inh1" edge="1" parent="1" source="HostPlayer" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=0;endSize=14;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="790" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="inh2" edge="1" parent="1" source="GuestPlayer" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=0;endSize=14;" target="Player">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="inh3" edge="1" parent="1" source="GyroPi" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=0;endSize=14;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" target="Game">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="inh4" edge="1" parent="1" source="NotePi" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;endFill=0;endSize=14;" target="Game">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="comp1" edge="1" parent="1" source="GameController" style="edgeStyle=orthogonalEdgeStyle;startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;" target="Gyroscope">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="comp1_t" connectable="0" parent="comp1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="0..1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="comp2" edge="1" parent="1" source="GameController" style="edgeStyle=orthogonalEdgeStyle;startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;" target="Display">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="comp2_t" connectable="0" parent="comp2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="comp3" edge="1" parent="1" source="GameController" style="edgeStyle=orthogonalEdgeStyle;startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;" target="Microphone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="comp3_t" connectable="0" parent="comp3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="0..1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="comp4" edge="1" parent="1" source="Course" style="edgeStyle=orthogonalEdgeStyle;startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;" target="Ball">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="comp4_t" connectable="0" parent="comp4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="comp5" edge="1" parent="1" source="Course" style="edgeStyle=orthogonalEdgeStyle;startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;" target="GoalArea">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="comp5_t" connectable="0" parent="comp5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="comp6" edge="1" parent="1" source="Course" style="edgeStyle=orthogonalEdgeStyle;startArrow=diamondThin;startFill=1;startSize=14;endArrow=none;" target="BlackHole">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="comp6_t" connectable="0" parent="comp6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1..*" vertex="1">
+          <mxGeometry relative="1" x="0.7" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a1" edge="1" parent="1" source="Player" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="GameController" value="uses">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a1_s" connectable="0" parent="a1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a1_t" connectable="0" parent="a1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a2" edge="1" parent="1" source="Server" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="GameRoom" value="manages">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2_s" connectable="0" parent="a2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a2_t" connectable="0" parent="a2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a3" edge="1" parent="1" source="Server" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="Scoreboard" value="maintains">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3_s" connectable="0" parent="a3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a3_t" connectable="0" parent="a3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a4" edge="1" parent="1" source="HostPlayer" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="GameRoom" value="creates">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a4_s" connectable="0" parent="a4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a4_t" connectable="0" parent="a4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a5" edge="1" parent="1" source="HostPlayer" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="GameRoom" value="joins">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5_t" connectable="0" parent="a5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6" edge="1" parent="1" source="GameRoom" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="Game" value="hosts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a6_s" connectable="0" parent="a6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a6_t" connectable="0" parent="a6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="0..1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a7" edge="1" parent="1" source="Game" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" target="Player" value="communicator">
+          <mxGeometry relative="1" x="0.0013" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="530" y="250" />
+              <mxPoint x="683" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a7_s" connectable="0" parent="a7" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a7_t" connectable="0" parent="a7" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a8" edge="1" parent="1" source="Game" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="Player_a1" value="performer">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="570" y="300" />
+              <mxPoint x="725" y="300" />
+            </Array>
+            <mxPoint x="650" y="110" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a8_s" connectable="0" parent="a8" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a8_t" connectable="0" parent="a8" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a9" edge="1" parent="1" source="Game" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" target="GameScore" value="produces">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="610" y="440" />
+              <mxPoint x="828" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a9_s" connectable="0" parent="a9" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a9_t" connectable="0" parent="a9" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a10" edge="1" parent="1" source="Scoreboard" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="GameScore" value="contains">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a10_s" connectable="0" parent="a10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a10_t" connectable="0" parent="a10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="0..50" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a11" edge="1" parent="1" source="GyroPi" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="Course" value="has">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a11_s" connectable="0" parent="a11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a11_t" connectable="0" parent="a11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a12" edge="1" parent="1" source="NotePi" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="SecretSequence" value="has">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a12_s" connectable="0" parent="a12" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a12_t" connectable="0" parent="a12" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a13" edge="1" parent="1" source="NotePi" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;exitX=0.75;exitY=1;exitDx=0;exitDy=0;" target="Attempt" value="has">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a13_s" connectable="0" parent="a13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a13_t" connectable="0" parent="a13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1..*" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a14" edge="1" parent="1" source="SecretSequence" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="Note" value="contains">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a14_s" connectable="0" parent="a14" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a14_t" connectable="0" parent="a14" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="5" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a15" edge="1" parent="1" source="Attempt" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="NoteSequence" value="contains">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a15_s" connectable="0" parent="a15" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a15_t" connectable="0" parent="a15" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a16" edge="1" parent="1" source="Attempt" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="NoteFeedback" value="produces">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a16_s" connectable="0" parent="a16" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a16_t" connectable="0" parent="a16" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="5" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a17" edge="1" parent="1" source="NoteSequence" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;" target="Note" value="contains">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a17_s" connectable="0" parent="a17" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a17_t" connectable="0" parent="a17" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="5" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7YG514UBHnxURCzVP0xV-2" edge="1" parent="1" source="GuestPlayer" style="edgeStyle=orthogonalEdgeStyle;endArrow=none;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" target="GameRoom" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="970" y="170" as="sourcePoint" />
+            <mxPoint x="835" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7YG514UBHnxURCzVP0xV-3" connectable="0" parent="7YG514UBHnxURCzVP0xV-2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;" value="0..1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="HostPlayer" parent="1" style="swimlane;fontStyle=0;align=center;startSize=40;html=1;" value="&lt;i&gt;«actor»&lt;/i&gt;&lt;br&gt;&lt;b&gt;HostPlayer&lt;/b&gt;" vertex="1">
+          <mxGeometry height="40" width="160" x="755" y="160" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
