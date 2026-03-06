@@ -25,6 +25,7 @@ public:
     void createRoom(const std::string& username);
     void joinRoom(const std::string& code, const std::string& username);
     void run();          // blocking — call from a background thread
+    void stop();         // signal run() to exit
     void requestStart(); // thread-safe — sends START_GAME from any thread
     void requestStartWithGame(const std::string& gameType); // sends START_GAME with game type
 

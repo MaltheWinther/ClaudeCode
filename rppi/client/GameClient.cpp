@@ -73,8 +73,13 @@ int GameClient::wsCallback(lws* wsi, lws_callback_reasons reason,
             s_game->onWritable(wsi);
             break;
         case LWS_CALLBACK_CLIENT_CLOSED:
-            s_game->wsi_     = nullptr;
-            s_game->running_ = false;
+            s_game->wsi_ = nullptr;
+            if (s_game->running_) {
+                s_game->running_ = false;
+                // Only report as error if we didn't already process GAME_OVER
+                if (s_game->onError_cb_)
+                    s_game->onError_cb_("Connection closed unexpectedly");
+            }
             break;
         case LWS_CALLBACK_EVENT_WAIT_CANCELLED:
             s_game->onWaitCancelled();
@@ -108,9 +113,10 @@ void GameClient::onMessage(const std::string& raw) {
     } else if (type == MsgType::GAME_OVER) {
         auto msg = MsgGameOver::parse(j);
         std::cout << "[Game] Game over — " << (msg.win ? "WIN" : "LOSS") << "\n";
+        running_ = false;          // set before callback to prevent re-entry
+        onError_cb_ = nullptr;     // suppress error callbacks after game over
         if (onGameOver_)
             onGameOver_(msg.win, msg.elapsedSecs, msg.levelsReached, msg.leaderboard);
-        running_ = false;
 
     } else if (type == MsgType::NOTE_STATE) {
         if (onNoteState_) onNoteState_(MsgNoteState::parse(j));

@@ -30,7 +30,7 @@ private:
     std::function<void(NoteEvent)> onNote_;
     std::mutex cbMutex_;
 
-    static constexpr float  MIN_CONFIDENCE = 0.8f;
+    static constexpr float  MIN_CONFIDENCE = 0.6f;
     static constexpr float  MIN_RMS = 0.005f;  // low threshold to allow phone speakers
 
     // Sustained-note detection: note must be held for SUSTAIN_MS before accepted
@@ -39,5 +39,5 @@ private:
     bool candidateFired_ = false;
     double cooldownUntilMs_ = 0.0;
     static constexpr double SUSTAIN_MS = 350.0;
-    static constexpr double COOLDOWN_MS = 400.0;  // ignore input after accepting a note
+    static constexpr double COOLDOWN_MS = 500.0;  // ignore input after accepting a note
 };

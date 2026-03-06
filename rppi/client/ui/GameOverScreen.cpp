@@ -64,7 +64,10 @@ void GameOverScreen::clearLeaderboard() {
 }
 
 void GameOverScreen::setResult(bool win, int elapsedSecs, int levelsReached,
-                               const std::vector<LeaderboardEntry>& leaderboard) {
+                               const std::vector<LeaderboardEntry>& leaderboard,
+                               const QString& gameType) {
+    gameType_ = gameType;
+
     if (win) {
         resultLabel_->setText("YOU WIN!");
         resultLabel_->setStyleSheet(
@@ -76,13 +79,17 @@ void GameOverScreen::setResult(bool win, int elapsedSecs, int levelsReached,
     }
 
     subtitleLabel_->setStyleSheet("font-size: 20px; color: #666;");
-    subtitleLabel_->setText(
-        QString("Time: %1s  |  Level %2/2").arg(elapsedSecs).arg(levelsReached));
+    if (gameType == "notepi")
+        subtitleLabel_->setText(
+            QString("Time: %1s  |  Attempts: %2").arg(elapsedSecs).arg(levelsReached));
+    else
+        subtitleLabel_->setText(
+            QString("Time: %1s  |  Level %2/2").arg(elapsedSecs).arg(levelsReached));
 
     // Build leaderboard
     clearLeaderboard();
     if (!leaderboard.empty()) {
-        auto* title = new QLabel("TOP 5", leaderboardWidget_);
+        auto* title = new QLabel("TOP 10", leaderboardWidget_);
         title->setAlignment(Qt::AlignCenter);
         title->setStyleSheet(
             "font-size: 14px; font-weight: bold; color: #888; letter-spacing: 2px;");
@@ -90,12 +97,21 @@ void GameOverScreen::setResult(bool win, int elapsedSecs, int levelsReached,
 
         int rank = 1;
         for (const auto& e : leaderboard) {
-            QString line = QString("%1. %2  —  %3s, L%4 %5")
-                .arg(rank++)
-                .arg(QString::fromStdString(e.players))
-                .arg(e.elapsedSecs)
-                .arg(e.levelsReached)
-                .arg(e.won ? "\u2713" : "\u2717");
+            QString line;
+            if (gameType == "notepi")
+                line = QString("%1. %2  —  %3s, %4 attempts %5")
+                    .arg(rank++)
+                    .arg(QString::fromStdString(e.players))
+                    .arg(e.elapsedSecs)
+                    .arg(e.levelsReached)
+                    .arg(e.won ? "\u2713" : "\u2717");
+            else
+                line = QString("%1. %2  —  %3s, L%4 %5")
+                    .arg(rank++)
+                    .arg(QString::fromStdString(e.players))
+                    .arg(e.elapsedSecs)
+                    .arg(e.levelsReached)
+                    .arg(e.won ? "\u2713" : "\u2717");
 
             auto* lbl = new QLabel(line, leaderboardWidget_);
             lbl->setAlignment(Qt::AlignCenter);

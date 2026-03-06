@@ -5,6 +5,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QPainter>
+#include <QMouseEvent>
 #include <QFont>
 
 NotePiScreen::NotePiScreen(QWidget* parent) : QWidget(parent) {}
@@ -103,6 +104,31 @@ void NotePiScreen::updateNoteState(const MsgNoteState& state) {
     history_ = state.history;
     waitingForPerformer_ = false;
     update();
+}
+
+void NotePiScreen::mousePressEvent(QMouseEvent* event) {
+    if (role_ != "performer") return;
+
+    int gridW = SEQ_LEN * (CELL_W + CELL_GAP) - CELL_GAP;
+    int startX = (width() - gridW) / 2;
+    int startY = 120;
+    int row = (int)history_.size();  // current input row
+
+    int mx = event->pos().x();
+    int my = event->pos().y();
+    int rowY = startY + row * (CELL_H + CELL_GAP);
+
+    if (my < rowY || my > rowY + CELL_H) return;
+
+    for (int col = 0; col < (int)currentNotes_.size(); ++col) {
+        int cellX = startX + col * (CELL_W + CELL_GAP);
+        if (mx >= cellX && mx <= cellX + CELL_W) {
+            currentNotes_.erase(currentNotes_.begin() + col);
+            if (submitBtn_) submitBtn_->setEnabled((int)currentNotes_.size() == SEQ_LEN);
+            update();
+            return;
+        }
+    }
 }
 
 void NotePiScreen::paintEvent(QPaintEvent*) {

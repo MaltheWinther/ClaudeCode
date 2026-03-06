@@ -9,8 +9,9 @@ class Leaderboard {
 public:
     static std::vector<LeaderboardEntry> load();
     static void                          addEntry(const LeaderboardEntry& e);
-    // Returns top N entries sorted: won desc → levelsReached desc → elapsedSecs asc
-    static std::vector<LeaderboardEntry> topN(int n = 5);
+    // Returns top N entries for a game type, sorted appropriately
+    static std::vector<LeaderboardEntry> topN(int n = 5,
+                                              const std::string& gameType = "gyropi");
 
 private:
     static std::string path();

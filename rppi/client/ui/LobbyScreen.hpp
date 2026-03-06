@@ -17,6 +17,7 @@ public:
 
 signals:
     void startClicked();
+    void exitLobby();
 
 private:
     QLabel*      codeLabel_;

@@ -190,22 +190,26 @@ int main(int argc, char* argv[]) {
                 }, Qt::QueuedConnection);
         });
 
-        game->setOnGameOver([&window, &gyro, &noteReader]
+        game->setOnGameOver([&window, &gyro, &noteReader, &gameType]
                             (bool win, int elapsed, int levels,
                              std::vector<LeaderboardEntry> lb) {
-            gyro.stop();
-            noteReader.stop();
+            // Don't block the network thread with stop() calls —
+            // do all cleanup in the Qt main thread instead
             QMetaObject::invokeMethod(&window,
-                [&window, win, elapsed, levels, lb = std::move(lb)]() mutable {
-                    window.showGameOver(win, elapsed, levels, lb);
+                [&window, &gyro, &noteReader, win, elapsed, levels,
+                 lb = std::move(lb), gt = std::string(gameType)]() mutable {
+                    gyro.stop();
+                    noteReader.stop();
+                    window.showGameOver(win, elapsed, levels, lb,
+                                        QString::fromStdString(gt));
                 }, Qt::QueuedConnection);
         });
 
         game->setOnError([&window, &gyro, &noteReader](std::string msg) {
-            gyro.stop();
-            noteReader.stop();
             QMetaObject::invokeMethod(&window,
-                [&window, m = std::move(msg)]() mutable {
+                [&window, &gyro, &noteReader, m = std::move(msg)]() mutable {
+                    gyro.stop();
+                    noteReader.stop();
                     window.showDisconnect(QString::fromStdString(m));
                 }, Qt::QueuedConnection);
         });
@@ -221,6 +225,12 @@ int main(int argc, char* argv[]) {
     QObject::connect(&window, &AppWindow::notePiNotesSubmitted,
                      [&](const std::vector<std::string>& notes) {
         if (game) game->submitNotes(notes);
+    });
+
+    // ── EXIT LOBBY → STOP LOBBY, BACK TO MAIN MENU ─────────────────────────
+    QObject::connect(&window, &AppWindow::exitLobbyClicked, [&]() {
+        if (lobby) { lobby->stop(); joinNetThread(); delete lobby; lobby = nullptr; }
+        window.showMainMenu(QString::fromStdString(username));
     });
 
     // ── EXIT GAME → STOP EVERYTHING, BACK TO MAIN MENU ─────────────────────

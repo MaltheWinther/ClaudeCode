@@ -44,10 +44,20 @@ LobbyScreen::LobbyScreen(QWidget* parent) : QWidget(parent) {
     layout->addWidget(codeLabel_,       0, Qt::AlignCenter);
     layout->addWidget(playerCountLabel_);
     layout->addWidget(statusLabel_);
+    auto* exitBtn = new QPushButton("BACK TO MAIN MENU", this);
+    exitBtn->setFixedWidth(220);
+    exitBtn->setFixedHeight(44);
+    exitBtn->setStyleSheet(
+        "font-size: 16px; background: #F44336; color: white;"
+        "border: none; border-radius: 8px;");
+
     layout->addWidget(playBtn_,         0, Qt::AlignCenter);
+    layout->addSpacing(10);
+    layout->addWidget(exitBtn,          0, Qt::AlignCenter);
     layout->addStretch();
 
     connect(playBtn_, &QPushButton::clicked, this, &LobbyScreen::startClicked);
+    connect(exitBtn,  &QPushButton::clicked, this, &LobbyScreen::exitLobby);
 }
 
 void LobbyScreen::setupHost(const QString& code, int playerCount) {

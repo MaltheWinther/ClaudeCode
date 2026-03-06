@@ -45,7 +45,8 @@ private:
     bool bothPlayersConnected() const;
 
     // ── Helpers ──────────────────────────────────────────────────────────
-    void sendTo(lws* wsi, const json& msg);
+    void sendTo(lws* wsi, const json& msg);      // replaces queue (for streaming state)
+    void queueTo(lws* wsi, const json& msg);     // appends to queue (for one-shot msgs)
     std::string currentDate() const;
 
     // ── Members ──────────────────────────────────────────────────────────
@@ -77,4 +78,7 @@ private:
     std::thread gameThread_;
 
     std::map<lws*, std::queue<std::string>> writeQueues_;
+
+    // Delayed stop: counts down in run() loop iterations after queuing final messages
+    int pendingStopCountdown_ = 0;
 };

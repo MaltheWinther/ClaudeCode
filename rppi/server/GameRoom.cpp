@@ -52,6 +52,13 @@ void GameRoom::run() {
         if (stateDirty_.exchange(false)) {
             broadcastGameState();
         }
+
+        // Delayed stop: give lws iterations to flush final messages
+        if (pendingStopCountdown_ > 0) {
+            if (--pendingStopCountdown_ == 0) {
+                stop();
+            }
+        }
     }
 
     if (gameThread_.joinable())
@@ -135,13 +142,12 @@ void GameRoom::onDisconnect(lws* wsi) {
     writeQueues_.erase(wsi);
 
     if (remaining) {
-        sendTo(remaining, MsgError::build("The other player disconnected"));
-        // Give lws a few cycles to flush the message before stopping
-        for (int i = 0; i < 10; ++i)
-            lws_service(context_, 10);
+        queueTo(remaining, MsgError::build("The other player disconnected"));
+        // Delayed stop — let run() loop flush the message naturally
+        pendingStopCountdown_ = 20;
+    } else {
+        stop();
     }
-
-    stop();
     std::cout << "[Room " << roomCode_ << "] A player disconnected, shutting down\n";
 }
 
@@ -200,22 +206,25 @@ void GameRoom::handleNoteSubmit(lws* wsi, const json& j) {
         notePi_->attemptCount(), msg.notes, result.colors,
         result.correct, notePi_->history());
 
-    if (performer_)    sendTo(performer_,    stateMsg);
-    if (communicator_) sendTo(communicator_, stateMsg);
+    if (performer_)    queueTo(performer_,    stateMsg);
+    if (communicator_) queueTo(communicator_, stateMsg);
 
     if (result.correct) {
         int elapsed = (int)std::chrono::duration<double>(
                           clock::now() - gameStartTime_).count();
         int attempts = notePi_->attemptCount();
 
-        LeaderboardEntry entry{ players_, elapsed, attempts, true, currentDate() };
+        LeaderboardEntry entry{ players_, elapsed, attempts, true, currentDate(), gameType_ };
         Leaderboard::addEntry(entry);
-        auto top = Leaderboard::topN(5);
+        auto top = Leaderboard::topN(10, gameType_);
 
         auto overMsg = MsgGameOver::build(true, elapsed, attempts, top);
-        if (performer_)    sendTo(performer_,    overMsg);
-        if (communicator_) sendTo(communicator_, overMsg);
-        stop();
+        if (performer_)    queueTo(performer_,    overMsg);
+        if (communicator_) queueTo(communicator_, overMsg);
+
+        // Delayed stop — let run() loop flush the messages naturally
+        // (recursive lws_service from a callback corrupts lws state)
+        pendingStopCountdown_ = 20;
     }
 }
 
@@ -281,14 +290,14 @@ void GameRoom::broadcastGameState() {
         int  levels  = game_ ? game_->getState().level : 1;
         bool win     = game_ && game_->isWon();
 
-        LeaderboardEntry entry{ players_, elapsed, levels, win, currentDate() };
+        LeaderboardEntry entry{ players_, elapsed, levels, win, currentDate(), gameType_ };
         Leaderboard::addEntry(entry);
-        auto top = Leaderboard::topN(5);
+        auto top = Leaderboard::topN(10, gameType_);
 
         auto msg = MsgGameOver::build(win, elapsed, levels, top);
-        if (performer_)    sendTo(performer_,    msg);
-        if (communicator_) sendTo(communicator_, msg);
-        stop();
+        if (performer_)    queueTo(performer_,    msg);
+        if (communicator_) queueTo(communicator_, msg);
+        pendingStopCountdown_ = 20;
         return;
     }
 
@@ -307,6 +316,11 @@ void GameRoom::sendTo(lws* wsi, const json& msg) {
     auto& q = writeQueues_[wsi];
     while (!q.empty()) q.pop();  // keep only latest state
     q.push(msg.dump());
+    lws_callback_on_writable(wsi);
+}
+
+void GameRoom::queueTo(lws* wsi, const json& msg) {
+    writeQueues_[wsi].push(msg.dump());
     lws_callback_on_writable(wsi);
 }
 

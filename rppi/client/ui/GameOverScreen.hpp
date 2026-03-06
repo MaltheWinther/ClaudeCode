@@ -13,7 +13,8 @@ public:
     explicit GameOverScreen(QWidget* parent = nullptr);
 
     void setResult(bool win, int elapsedSecs, int levelsReached,
-                   const std::vector<LeaderboardEntry>& leaderboard);
+                   const std::vector<LeaderboardEntry>& leaderboard,
+                   const QString& gameType = "gyropi");
     void setDisconnect(const QString& msg);
 
 signals:
@@ -27,4 +28,5 @@ private:
     QLabel*      subtitleLabel_;
     QVBoxLayout* leaderboardLayout_;
     QWidget*     leaderboardWidget_;
+    QString      gameType_;
 };

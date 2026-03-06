@@ -24,7 +24,8 @@ std::vector<LeaderboardEntry> Leaderboard::load() {
                 e.value("elapsed_secs",   0),
                 e.value("levels_reached", 1),
                 e.value("won",            false),
-                e.value("date",           "")
+                e.value("date",           ""),
+                e.value("game_type",      "")
             });
         }
     } catch (const std::exception& ex) {
@@ -44,7 +45,8 @@ void Leaderboard::addEntry(const LeaderboardEntry& e) {
             {"elapsed_secs",   entry.elapsedSecs},
             {"levels_reached", entry.levelsReached},
             {"won",            entry.won},
-            {"date",           entry.date}
+            {"date",           entry.date},
+            {"game_type",      entry.gameType}
         });
     }
 
@@ -55,16 +57,34 @@ void Leaderboard::addEntry(const LeaderboardEntry& e) {
         std::cerr << "[Leaderboard] Could not write to " << path() << "\n";
 }
 
-std::vector<LeaderboardEntry> Leaderboard::topN(int n) {
-    auto entries = load();
+std::vector<LeaderboardEntry> Leaderboard::topN(int n, const std::string& gameType) {
+    auto all = load();
 
-    std::sort(entries.begin(), entries.end(),
-              [](const LeaderboardEntry& a, const LeaderboardEntry& b) {
-        if (a.won != b.won)              return a.won > b.won;           // won first
-        if (a.levelsReached != b.levelsReached)
-                                         return a.levelsReached > b.levelsReached;
-        return a.elapsedSecs < b.elapsedSecs;  // faster is better
-    });
+    // Filter to matching game type only
+    std::vector<LeaderboardEntry> entries;
+    for (auto& e : all) {
+        if (e.gameType == gameType) entries.push_back(std::move(e));
+    }
+
+    if (gameType == "notepi") {
+        // NotePi: won first → fewer attempts → faster time
+        std::sort(entries.begin(), entries.end(),
+                  [](const LeaderboardEntry& a, const LeaderboardEntry& b) {
+            if (a.won != b.won) return a.won > b.won;
+            if (a.levelsReached != b.levelsReached)
+                return a.levelsReached < b.levelsReached;  // fewer attempts = better
+            return a.elapsedSecs < b.elapsedSecs;
+        });
+    } else {
+        // GyroPi: won first → more levels → faster time
+        std::sort(entries.begin(), entries.end(),
+                  [](const LeaderboardEntry& a, const LeaderboardEntry& b) {
+            if (a.won != b.won) return a.won > b.won;
+            if (a.levelsReached != b.levelsReached)
+                return a.levelsReached > b.levelsReached;  // more levels = better
+            return a.elapsedSecs < b.elapsedSecs;
+        });
+    }
 
     if ((int)entries.size() > n)
         entries.resize(n);

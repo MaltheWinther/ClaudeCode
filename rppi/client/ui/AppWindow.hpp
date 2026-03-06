@@ -37,7 +37,8 @@ public:
     void updateNoteState(const MsgNoteState& state);
     void updateGameState(float ballX, float ballY, float pitch, float roll, int level);
     void showGameOver(bool win, int elapsedSecs, int levelsReached,
-                      const std::vector<LeaderboardEntry>& leaderboard);
+                      const std::vector<LeaderboardEntry>& leaderboard,
+                      const QString& gameType = "gyropi");
     void showDisconnect(const QString& msg);
 
 signals:
@@ -50,6 +51,7 @@ signals:
     void notePiNotesSubmitted(const std::vector<std::string>& notes);
     void playAgainClicked();
     void exitGameClicked();
+    void exitLobbyClicked();
 
 private:
     QStackedWidget*  stack_;

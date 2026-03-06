@@ -50,6 +50,7 @@ struct LeaderboardEntry {
     int         levelsReached;
     bool        won;
     std::string date;         // "2026-03-01"
+    std::string gameType;     // "gyropi" or "notepi"
 };
 
 // ─────────────────────────────────────────────
@@ -223,7 +224,8 @@ struct MsgGameOver {
                 {"elapsed_secs", e.elapsedSecs},
                 {"levels_reached", e.levelsReached},
                 {"won", e.won},
-                {"date", e.date}
+                {"date", e.date},
+                {"game_type", e.gameType}
             });
         }
         j["leaderboard"] = lbArr;
@@ -241,7 +243,8 @@ struct MsgGameOver {
                     e.value("elapsed_secs",   0),
                     e.value("levels_reached", 1),
                     e.value("won",            false),
-                    e.value("date",           "")
+                    e.value("date",           ""),
+                    e.value("game_type",      "")
                 });
             }
         }

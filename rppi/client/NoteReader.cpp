@@ -162,22 +162,21 @@ void NoteReader::loop() {
             float freq = fvec_get_sample(outputBuf, 0);
             float conf = aubio_pitch_get_confidence(pitch);
 
-            std::cerr << "[NoteReader] rms=" << rms
-                      << " freq=" << freq
-                      << " conf=" << conf << "\n";
-
             if (conf < MIN_CONFIDENCE) continue;
 
             std::string noteName = frequencyToNote(freq);
-            if (noteName.empty()) {
-                std::cerr << "[NoteReader] freq " << freq << " out of range\n";
-                continue;
-            }
+            if (noteName.empty()) continue;
 
             double now = nowMs();
 
             // Cooldown after accepting a note — let old tone fade
             if (now < cooldownUntilMs_) continue;
+
+            // After cooldown, reset so same note can be detected again
+            if (candidateFired_) {
+                candidateNote_.clear();
+                candidateFired_ = false;
+            }
 
             // If note changed, start a new candidate
             if (noteName != candidateNote_) {
@@ -265,6 +264,12 @@ void NoteReader::loop() {
 
         // Cooldown after accepting a note — let old tone fade
         if (now < cooldownUntilMs_) continue;
+
+        // After cooldown, reset so same note can be detected again
+        if (candidateFired_) {
+            candidateNote_.clear();
+            candidateFired_ = false;
+        }
 
         // If note changed, start a new candidate
         if (noteName != candidateNote_) {

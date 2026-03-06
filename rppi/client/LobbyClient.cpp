@@ -54,6 +54,11 @@ void LobbyClient::run() {
         lws_service(context_, 50);
 }
 
+void LobbyClient::stop() {
+    running_ = false;
+    if (context_) lws_cancel_service(context_);
+}
+
 // Called from any thread — enqueues START_GAME and wakes the lws loop
 void LobbyClient::requestStart() {
     {

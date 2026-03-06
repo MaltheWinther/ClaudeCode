@@ -41,6 +41,7 @@ AppWindow::AppWindow(QWidget* parent) : QMainWindow(parent) {
     connect(gameOverScreen_, &GameOverScreen::playAgain,   this, &AppWindow::playAgainClicked);
     connect(gameScreen_,     &GameScreen::exitGame,        this, &AppWindow::exitGameClicked);
     connect(notePiScreen_,   &NotePiScreen::exitGame,      this, &AppWindow::exitGameClicked);
+    connect(lobbyScreen_,    &LobbyScreen::exitLobby,      this, &AppWindow::exitLobbyClicked);
 }
 
 void AppWindow::showUsername() {
@@ -116,8 +117,9 @@ void AppWindow::updateGameState(float ballX, float ballY,
 }
 
 void AppWindow::showGameOver(bool win, int elapsedSecs, int levelsReached,
-                             const std::vector<LeaderboardEntry>& leaderboard) {
-    gameOverScreen_->setResult(win, elapsedSecs, levelsReached, leaderboard);
+                             const std::vector<LeaderboardEntry>& leaderboard,
+                             const QString& gameType) {
+    gameOverScreen_->setResult(win, elapsedSecs, levelsReached, leaderboard, gameType);
     stack_->setCurrentWidget(gameOverScreen_);
 }
 
