@@ -6,3 +6,6 @@ build/
 
 # Claude Code
 .claude/settings.local.json
+
+# Personal docs (not rppi/docs)
+docs/
