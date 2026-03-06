@@ -1,0 +1,51 @@
+@startuml Client Thread Model
+
+title Client: Traad-kommunikation (NotePi eksempel)
+
+skinparam sequenceArrowThickness 2
+skinparam participantPadding 10
+
+participant "Qt Main Thread\n(UI + event loop)" as QT
+participant "Network Thread\n(lws event loop)" as NET
+participant "NoteReader Thread\n(audio + pitch)" as AUDIO
+
+== Opstart ==
+QT -> QT: app.exec() starter Qt event loop
+QT -> NET: std::thread(GameClient::run)
+QT -> AUDIO: noteReader.start()\n-> std::thread(NoteReader::loop)
+
+== Performer spiller tone ==
+AUDIO -> AUDIO: CoreAudio callback\n-> ring buffer\n-> aubio pitch\n-> "A" detekteret
+
+AUDIO -[#blue]-> QT: **QMetaObject::invokeMethod**\n(&window, [note="A"]{...},\nQt::QueuedConnection)
+note right of AUDIO: Lambda postes til\nQt event queue.\nAudio-traad blokerer IKKE.
+
+QT -> QT: Lambda koerer:\nwindow.addDetectedNote("A")\n-> NotePiScreen viser "A"
+
+== Performer trykker SUBMIT ==
+QT -> NET: game->submitNotes(["A","C",...])\n-> mutex-beskyttet queue\n-> lws_cancel_service() (vaekker lws)
+
+NET -> NET: lws_service() -> onWritable()\n-> sender note_submit JSON
+
+== Server svarer ==
+NET -> NET: lws_service() -> onMessage()\n-> parser note_state
+
+NET -[#blue]-> QT: **QMetaObject::invokeMethod**\n(&window, [noteState]{...},\nQt::QueuedConnection)
+
+QT -> QT: Lambda koerer:\nwindow.updateNoteState(state)\n-> NotePiScreen viser farver
+
+== Game Over ==
+NET -> NET: Modtager game_over besked
+
+NET -[#blue]-> QT: **QMetaObject::invokeMethod**\n(&window, [win, lb, ...]{...},\nQt::QueuedConnection)
+note right of NET: VIGTIGT: gyro.stop() og\nnoteReader.stop() kaldes\ni Qt-lambdaen, IKKE her.\n(Undgar at blokere lws)
+
+QT -> QT: gyro.stop()\nnoteReader.stop()
+QT -> AUDIO: running_ = false\nthread_.join()
+note over AUDIO: Traaden stopper
+
+QT -> QT: window.showGameOver(...)
+
+note over QT: **GYLDEN REGEL:**\nUI maa KUN opdateres\nfra Qt main thread.\nAndre traade bruger\ninvokeMethod + QueuedConnection.
+
+@enduml

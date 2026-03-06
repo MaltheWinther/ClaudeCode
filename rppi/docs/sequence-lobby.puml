@@ -1,0 +1,54 @@
+@startuml Lobby Flow - Opret rum og start spil
+
+title Lobby Flow: Fra opstart til spilstart
+
+skinparam sequenceArrowThickness 2
+skinparam participantPadding 20
+
+actor "Host\n(bin/client)" as H
+actor "Guest\n(bin/client)" as G
+participant "LobbyServer\n(bin/server)\nport 9000" as LS
+participant "GameRoom\n(bin/game_room)\nport 900x" as GR
+
+== Fase 1: Brugernavn ==
+note over H: Indlaeser username fra\n~/.rppi_credentials\neller viser UsernameScreen
+
+note over G: Samme flow
+
+== Fase 2: Opret rum ==
+H -> LS: **create_room**\n{username: "Alice"}
+LS -> LS: Generer 4-tegn kode\n(fx "X7K3")
+LS --> H: **room_created**\n{code: "X7K3"}
+note over H: Viser LobbyScreen\nmed kode "X7K3"\nog venter pa guest
+
+== Fase 3: Join rum ==
+note over G: Bruger indtaster kode "X7K3"
+G -> LS: **join_room**\n{code: "X7K3", username: "Bob"}
+LS --> G: **room_joined**\n{code: "X7K3"}
+LS --> H: **player_joined**\n{count: 2, host: "Alice", guest: "Bob"}
+LS --> G: **player_joined**\n{count: 2, host: "Alice", guest: "Bob"}
+note over H: PLAY knap bliver aktiv
+note over G: Ser "Waiting for host..."
+
+== Fase 4: Vaelg spil og start ==
+note over H: Trykker PLAY -> GameSelectScreen\nVaelger "NotePi" eller "GyroPi"
+H -> LS: **start_game**\n{game: "notepi"}
+
+LS -> LS: Tilfaeldig rolle-tildeling\n(50/50 performer/communicator)
+LS -> GR: **fork() + execl()**\n./bin/game_room X7K3 9001\nAlice Bob notepi
+
+LS --> H: **role_assigned**\n{role: "performer",\ngame_port: 9001,\ngame: "notepi"}
+LS --> G: **role_assigned**\n{role: "communicator",\ngame_port: 9001,\ngame: "notepi"}
+
+note over H: RoleScreen: "You are PERFORMER"\n3... 2... 1...
+note over G: RoleScreen: "You are COMMUNICATOR"\n3... 2... 1...
+
+== Fase 5: Forbind til GameRoom ==
+note over GR: Lytter pa port 9001\nVenter pa begge spillere
+
+H -> GR: **identify**\n{role: "performer"}
+G -> GR: **identify**\n{role: "communicator"}
+
+note over GR: Begge forbundet!\nSpillet starter
+
+@enduml

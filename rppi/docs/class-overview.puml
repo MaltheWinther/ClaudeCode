@@ -1,0 +1,235 @@
+@startuml Class Overview
+
+title RPPi - Klasseoversigt (forenklet)
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+hide empty methods
+
+' ============ SERVER SIDE ============
+
+package "Server (bin/server)" #LightBlue {
+  class LobbyServer {
+    -port_ : int
+    -rooms_ : map<string, Room>
+    -clientRooms_ : map<lws*, string>
+    -nextGamePort_ : int
+    --
+    +run() : void
+    +stop() : void
+    -handleCreateRoom()
+    -handleJoinRoom()
+    -handleStartGame()
+    -spawnGameRoom() : int
+    -generateRoomCode() : string
+  }
+
+  class "Room (inner struct)" as Room {
+    code : string
+    hostName : string
+    guestName : string
+    host : lws*
+    guest : lws*
+    state : WAITING|FULL|PLAYING
+  }
+
+  LobbyServer *-- Room : indeholder mange
+}
+
+package "Game Room (bin/game_room)" #LightGreen {
+  class GameRoom {
+    -roomCode_ : string
+    -gameType_ : string
+    -performer_ : lws*
+    -communicator_ : lws*
+    --
+    +run() : void
+    +stop() : void
+    -handleIdentify()
+    -handleGyroData()
+    -handleNoteSubmit()
+    -gameLoopThread()
+    -broadcastGameState()
+    -sendTo() / queueTo()
+  }
+
+  interface IGame {
+    +update(pitch, roll, dt)
+    +getState() : GameState
+    +isFinished() : bool
+    +isWon() : bool
+  }
+
+  class GyroPiGame {
+    -levels_ : vector<Level>
+    -bx_, by_ : float (bold pos)
+    -vx_, vy_ : float (velocity)
+    --
+    +update() : fysik simulation
+    -resolveWall() : collision
+  }
+
+  class NotePiGame {
+    -target_ : vector<string> (5 noter)
+    -history_ : vector<NoteAttempt>
+    -attemptCount_ : int
+    --
+    +submitGuess() : GuessResult
+    +allNotes() : de 12 noter
+  }
+
+  class Leaderboard {
+    {static} +load() : vector<Entry>
+    {static} +addEntry(entry)
+    {static} +topN(n, gameType) : vector<Entry>
+  }
+
+  GameRoom *-- IGame : ejer (GyroPi)
+  GameRoom *-- NotePiGame : ejer (NotePi)
+  GyroPiGame ..|> IGame
+  GameRoom --> Leaderboard : bruger
+}
+
+' ============ SHARED ============
+
+package "Common" #LightYellow {
+  class "Messages.hpp" as MSG {
+    MsgCreateRoom
+    MsgJoinRoom
+    MsgStartGame
+    MsgIdentify
+    MsgGyroData
+    MsgNoteSubmit
+    --
+    MsgRoomCreated
+    MsgRoomJoined
+    MsgPlayerJoined
+    MsgRoleAssigned
+    MsgGameState
+    MsgNoteState
+    MsgGameOver
+    MsgError
+    --
+    LeaderboardEntry
+  }
+}
+
+' ============ CLIENT SIDE ============
+
+package "Client (bin/client)" #LightPink {
+  class "main.cpp\n(orchestrator)" as MAIN {
+    Forbinder alle signals/slots
+    Opretter LobbyClient + GameClient
+    Ejer GyroReader + NoteReader
+    --
+    Al logik for skift mellem
+    lobby -> spil -> game over
+  }
+
+  class LobbyClient {
+    -host_, port_ : string, int
+    -intent_ : CREATE|JOIN
+    --
+    +createRoom(username)
+    +joinRoom(code, username)
+    +run() : blokkerende
+    +stop()
+    +requestStartWithGame(type)
+    --
+    Callbacks:
+    onRoomCreated_
+    onPlayerJoined_
+    onRoleAssigned_
+    onError_
+  }
+
+  class GameClient {
+    -host_, port_ : string, int
+    -role_ : string
+    --
+    +run() : blokkerende
+    +stop()
+    +submitNotes(notes)
+    --
+    Callbacks:
+    onGameState_
+    onNoteState_
+    onGameOver_
+    onError_cb_
+  }
+
+  class GyroReader {
+    -spiDevice_ : string
+    -pitch_, roll_ : double
+    --
+    +start() : spawner traad
+    +stop()
+    +read() : Angles (thread-safe)
+    -loop() : BMI160 SPI + filter
+  }
+
+  class NoteReader {
+    -candidateNote_ : string
+    -SUSTAIN_MS : 350
+    -COOLDOWN_MS : 500
+    --
+    +start() : spawner traad
+    +stop()
+    +setOnNoteDetected(callback)
+    -loop() : mic + aubio pitch
+    -frequencyToNote(freq) : string
+  }
+
+  class Credentials {
+    {static} +load() : string
+    {static} +save(username)
+    {static} +isValid(u) : bool
+  }
+
+  MAIN --> LobbyClient : opretter
+  MAIN --> GameClient : opretter
+  MAIN --> GyroReader : ejer
+  MAIN --> NoteReader : ejer
+  MAIN --> Credentials : bruger
+}
+
+package "Client UI (Qt6)" #Wheat {
+  class AppWindow {
+    -stack_ : QStackedWidget
+    --
+    Koordinerer alle skaerme
+    via signals/slots
+  }
+
+  class UsernameScreen
+  class MainMenuScreen
+  class LobbyScreen
+  class GameSelectScreen
+  class RoleScreen
+  class GameScreen
+  class NotePiScreen
+  class GameOverScreen
+
+  AppWindow *-- UsernameScreen
+  AppWindow *-- MainMenuScreen
+  AppWindow *-- LobbyScreen
+  AppWindow *-- GameSelectScreen
+  AppWindow *-- RoleScreen
+  AppWindow *-- GameScreen
+  AppWindow *-- NotePiScreen
+  AppWindow *-- GameOverScreen
+}
+
+MAIN --> AppWindow : ejer
+
+' ============ RELATIONS ============
+
+LobbyServer ..> GameRoom : fork+exec
+LobbyClient ..> LobbyServer : WebSocket :9000
+GameClient ..> GameRoom : WebSocket :900x
+MSG <.. LobbyServer : bruger
+MSG <.. LobbyClient : bruger
+MSG <.. GameRoom : bruger
+MSG <.. GameClient : bruger
+
+@enduml

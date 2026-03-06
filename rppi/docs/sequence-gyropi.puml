@@ -1,0 +1,68 @@
+@startuml GyroPi Game Flow
+
+title GyroPi: Spil-flow fra start til game over
+
+skinparam sequenceArrowThickness 2
+skinparam participantPadding 20
+
+actor "Performer\n(bin/client)" as P
+participant "GyroReader\n(BMI160 SPI)" as GYRO
+participant "GameClient\n(netvaerk)" as GC
+participant "GameRoom\n(bin/game_room)" as GR
+participant "GyroPiGame\n(fysik)" as GP
+participant "GameRoom\n(broadcast)" as GRB
+actor "Communicator\n(bin/client)" as C
+
+== Spilstart ==
+note over GR: Opretter GyroPiGame\nLevel 1: labyrint med vaegge,\nsorte huller og maal
+note over GR: Starter gameLoopThread\n(~40Hz fysik-simulation)
+
+== Kontinuerlig game loop (40 gange i sekundet) ==
+
+loop Hvert 25ms
+
+  GYRO -> GYRO: Laes BMI160 accelerometer\n+ gyroskop via SPI
+  GYRO -> GYRO: Complementary filter:\npitch/roll vinkler
+
+  P -> GC: Laes angles fra GyroReader\n(mutex-beskyttet)
+  GC -> GR: **gyro_data**\n{pitch: 12.5, roll: -8.3}
+
+  note over GR: Gemmer gyro i gyro_\n(mutex-beskyttet)
+
+  GR -> GP: update(pitch, roll, dt)
+  note over GP: 1. Acceleration fra tilt\n   vx += sin(roll) * G * dt\n2. Friktion\n   vx *= e^(-friction * dt)\n3. Flyt bold\n   bx += vx * dt\n4. Vaeg-kollision\n   (AABB + cirkel, bounce)\n5. Sort hul? -> Reset til start\n6. Maal? -> Naeste level / WIN
+
+  GP --> GR: GameState {ballX, ballY, level}
+  GR -> GR: stateDirty_ = true
+
+  GRB --> P: **game_state**\n{ball_x, ball_y,\npitch, roll, level}
+  GRB --> C: **game_state**\n(same)
+
+  note over P: Viser tilt-indikator\n(pil der viser hvilken\nretning man vipper)
+  note over C: Tegner labyrint med\nbold, vaegge, huller\nog maal via QPainter
+
+end
+
+== Sort hul ==
+note over GP: Bold rammer sort hul!\nbx = startX, by = startY\nvx = 0, vy = 0
+note over C: Ser bolden hoppe\ntilbage til start
+note over C: "Pas paa hullet til hojre!"
+
+== Level gennemfoert ==
+note over GP: Bold naar maal!\ncurrentLevel_++ (-> level 2)\nNy start-position
+
+== Spil vundet (level 2 maal) ==
+note over GP: finished_ = true\nwon_ = true
+note over GR: pendingState_.ballX = -1\n(sentinel for game over)
+
+GR -> GR: broadcastGameState()\nSer ballX < 0 -> game over
+
+note over GR: Gemmer i leaderboard\nHenter top 10
+
+GR --> P: **game_over**\n{win: true, elapsed_secs: 120,\nlevels_reached: 2,\nleaderboard: [...]}
+GR --> C: **game_over**\n(same)
+
+note over P: GameOverScreen:\n"YOU WIN!"\nTime: 120s | Level 2/2
+note over C: Samme skaerm
+
+@enduml

@@ -1,0 +1,63 @@
+@startuml NotePi Game Flow
+
+title NotePi: Spil-flow fra start til game over
+
+skinparam sequenceArrowThickness 2
+skinparam participantPadding 20
+
+actor "Performer\n(bin/client)" as P
+participant "Mikrofon\n+ aubio\n(NoteReader)" as MIC
+participant "GameRoom\n(bin/game_room)" as GR
+participant "NotePiGame" as NP
+actor "Communicator\n(bin/client)" as C
+
+== Spilstart ==
+note over GR: Opretter NotePiGame\nVaelger 5 tilfaeldige noter\nfx [C, G, A, F#, D]
+note over P: Ser 5 tomme felter\n(graa celler)
+note over C: Ser 5 tomme felter\n+ Wordle-farver naar gaet kommer
+
+== Runde 1: Performer spiller noter ==
+note over P: Holder telefon op\ntil mikrofon og\nspiller en tone
+
+MIC -> MIC: Audio frame (512 samples)\n1. RMS check (> 0.008?)\n2. aubio pitch detection (YIN)\n3. Confidence check (> 0.6?)\n4. Frekvens -> notenavn\n5. Sustain check (350ms)\n6. Cooldown (500ms)
+
+MIC --> P: NoteEvent {note: "C", confidence: 0.85}
+note over P: Celle 1 viser "C"\nSpiller naeste tone...
+
+note over P: Har nu 5 noter: [C, E, A, F#, B]\nTrykker SUBMIT
+
+P -> GR: **note_submit**\n{notes: ["C","E","A","F#","B"]}
+
+GR -> NP: submitGuess(["C","E","A","F#","B"])
+note over NP: Sammenligner med maal [C, G, A, F#, D]:\nC=C -> **groen**\nE!=G, E ikke i maal -> **roed**\nA=A -> **groen**\nF#=F# -> **groen**\nB!=D, B ikke i maal -> **roed**
+
+NP --> GR: {colors: [groen, roed, groen, groen, roed],\ncorrect: false}
+
+GR --> P: **note_state**\n{attempt: 1, notes: [...],\ncolors: [...], correct: false,\nhistory: [{...}]}
+GR --> C: **note_state**\n(same)
+
+note over P: Ser noter i graa\n(performer ser IKKE farver)
+note over C: Ser noter med farver:\n[GROEN] C  [ROED] E  [GROEN] A  [GROEN] F#  [ROED] B\nGuider performer: "1, 3 og 4 er rigtige!\n2 og 5 er forkerte"
+
+== Runde 2: Performer proever igen ==
+note over P: Spiller nye toner baseret\npa communicators feedback
+P -> GR: **note_submit**\n{notes: ["C","G","A","F#","D"]}
+
+GR -> NP: submitGuess(["C","G","A","F#","D"])
+note over NP: Alle 5 matcher!\ncorrect: true
+
+NP --> GR: {colors: [groen x5], correct: true}
+
+GR --> P: **note_state** (alle groenne)
+GR --> C: **note_state** (alle groenne)
+
+== Game Over ==
+note over GR: Beregner tid og attempts\nGemmer i leaderboard\nHenter top 10
+
+GR --> P: **game_over**\n{win: true, elapsed_secs: 45,\nlevels_reached: 2,\nleaderboard: [...]}
+GR --> C: **game_over**\n(same)
+
+note over P: GameOverScreen:\n"YOU WIN!"\nTime: 45s | Attempts: 2\nTop 10 leaderboard
+note over C: Samme skaerm
+
+@enduml
