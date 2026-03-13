@@ -1,4 +1,4 @@
-# WebSocket-moensteret med libwebsockets (lws)
+# TCP-netvaerksmoensteret med Qt Network
 
 ## Hvorfor dette er vigtigt
 
@@ -7,156 +7,181 @@ bruger det SAMME moenser. Forstaar du et, forstaar du alle fire.
 
 ## Det grundlaeggende moenser
 
-libwebsockets er callback-baseret. Du registrerer en callback-funktion,
-og lws kalder den naar der sker noget (ny forbindelse, besked modtaget, klar til at skrive).
+Alle netvaerksklasser arver `QObject` og bruger Qt's signal/slot system
+til non-blocking I/O. Servere bruger `QTcpServer`, clients bruger `QTcpSocket`.
 
-### 1. Opret context
+### 1. Server-side: Opret QTcpServer
 
 ```cpp
-lws_protocols protocols[] = {
-    { "protocol-name", MyClass::wsCallback, 0, 4096, 0, nullptr, 0 },
-    { nullptr, nullptr, 0, 0, 0, nullptr, 0 }  // terminator
+class LobbyServer : public QObject {
+    Q_OBJECT
+public:
+    LobbyServer(int port) {
+        tcpServer_ = new QTcpServer(this);
+        connect(tcpServer_, &QTcpServer::newConnection,
+                this, &LobbyServer::onNewConnection);
+        tcpServer_->listen(QHostAddress::Any, port);
+    }
+
+private slots:
+    void onNewConnection() {
+        while (QTcpSocket* socket = tcpServer_->nextPendingConnection()) {
+            readers_[socket];  // opret TcpFrameReader for denne client
+            connect(socket, &QTcpSocket::readyRead,
+                    this, &LobbyServer::onClientReadyRead);
+            connect(socket, &QTcpSocket::disconnected,
+                    this, &LobbyServer::onClientDisconnected);
+        }
+    }
 };
-
-lws_context_creation_info info{};
-info.port      = 9000;        // server: lyt-port, client: CONTEXT_PORT_NO_LISTEN
-info.protocols = protocols;
-
-context_ = lws_create_context(&info);
 ```
 
-### 2. Event loop
+### 2. Client-side: Opret QTcpSocket
 
 ```cpp
-void MyClass::run() {
-    running_ = true;
-    while (running_)
-        lws_service(context_, 50);  // blokkerer op til 50ms, processer events
-}
-```
-
-`lws_service()` er hjertet: den checker for nye forbindelser, modtager data,
-og kalder callbacks. Uden den sker der ingenting.
-
-### 3. Static callback (det svaereste koncept)
-
-lws kraever en **static** callback fordi det er et C-bibliotek (ikke C++).
-Vi bruger et globalt pointer-trick:
-
-```cpp
-static MyClass* s_instance = nullptr;  // global
-
-MyClass::MyClass() {
-    s_instance = this;
-    // ...
-}
-
-// Static -- ingen 'this' pointer
-int MyClass::wsCallback(lws* wsi, lws_callback_reasons reason,
-                         void* user, void* in, size_t len) {
-    if (!s_instance) return 0;
-
-    switch (reason) {
-        case LWS_CALLBACK_ESTABLISHED:       // server: ny client forbundet
-        case LWS_CALLBACK_CLIENT_ESTABLISHED: // client: forbundet til server
-            s_instance->onConnect(wsi);
-            break;
-
-        case LWS_CALLBACK_RECEIVE:            // server: modtaget besked
-        case LWS_CALLBACK_CLIENT_RECEIVE:     // client: modtaget besked
-            s_instance->onMessage(wsi, string(static_cast<char*>(in), len));
-            break;
-
-        case LWS_CALLBACK_SERVER_WRITEABLE:   // server: klar til at sende
-        case LWS_CALLBACK_CLIENT_WRITEABLE:   // client: klar til at sende
-            s_instance->onWritable(wsi);
-            break;
-
-        case LWS_CALLBACK_CLOSED:             // server: client disconnected
-        case LWS_CALLBACK_CLIENT_CLOSED:      // client: disconnected
-            s_instance->onDisconnect(wsi);
-            break;
+class LobbyClient : public QObject {
+    Q_OBJECT
+public:
+    void connectToServer() {
+        socket_ = new QTcpSocket(this);
+        connect(socket_, &QTcpSocket::connected,
+                this, &LobbyClient::onConnected);
+        connect(socket_, &QTcpSocket::readyRead,
+                this, &LobbyClient::onReadyRead);
+        connect(socket_, &QTcpSocket::disconnected,
+                this, &LobbyClient::onDisconnected);
+        socket_->connectToHost(host, port);  // non-blocking!
     }
-    return 0;
+};
+```
+
+**connectToHost()** returnerer med det samme. Naar forbindelsen er klar,
+fires `connected` signalet og `onConnected()` slot korer.
+
+### 3. Length-prefix framing (TcpFraming.hpp)
+
+TCP er en byte-stream -- den har ikke besked-graenser som WebSocket.
+Vi bruger en simpel framing-protokol:
+
+```
+[4 bytes: besked-laengde (big-endian)][JSON payload]
+```
+
+**Sende:**
+```cpp
+void sendTo(QTcpSocket* socket, const json& msg) {
+    socket->write(frameMessage(msg.dump()));
 }
 ```
 
-**Vigtigt**: `wsi` (WebSocket Instance) er en pointer der identificerer
-en specifik forbindelse. Serveren har mange wsi'er (en per client),
-clienten har typisk en.
+`frameMessage()` prepender 4 bytes med laengden, sa modtageren ved
+praecis hvor mange bytes der hoerer til denne besked.
 
-### 4. Sende beskeder (write queue)
-
-Man kan IKKE skrive til en WebSocket naar som helst. Man skal:
-1. Laegge beskeden i en koe
-2. Fortaelle lws at vi vil skrive: `lws_callback_on_writable(wsi)`
-3. Vente paa `LWS_CALLBACK_SERVER_WRITEABLE` callback
-4. Skrive med `lws_write()` og LWS_PRE padding
-
+**Modtage:**
 ```cpp
-// Koere besked
-void sendTo(lws* wsi, const json& msg) {
-    writeQueues_[wsi].push(msg.dump());
-    lws_callback_on_writable(wsi);  // "sig til lws at vi vil skrive"
-}
-
-// Callback naar lws er klar
-void onWritable(lws* wsi) {
-    auto& queue = writeQueues_[wsi];
-    if (queue.empty()) return;
-
-    const string& msg = queue.front();
-
-    // LWS_PRE: lws kraever padding FOER data (til interne headers)
-    vector<unsigned char> buf(LWS_PRE + msg.size());
-    memcpy(buf.data() + LWS_PRE, msg.data(), msg.size());
-    lws_write(wsi, buf.data() + LWS_PRE, msg.size(), LWS_WRITE_TEXT);
-
-    queue.pop();
-    if (!queue.empty())
-        lws_callback_on_writable(wsi);  // der er mere at sende
-}
-```
-
-**Hvorfor LWS_PRE?** lws bruger plads foer din data til WebSocket frame headers.
-I stedet for at kopiere din data, kraever den at du allokerer ekstra plads foran.
-
-### 5. sendTo vs queueTo
-
-Systemet har to maader at sende pa:
-
-- **sendTo()**: Rydder koeen foerst, behold kun nyeste besked.
-  Bruges til streaming data (game_state ved 40Hz) -- kun seneste position matters.
-
-- **queueTo()**: Tilfoej til koeen uden at rydde.
-  Bruges til vigtige enkelt-beskeder (note_state, game_over) der IKKE maa droppes.
-
-## Traad-sikkerhed med lws
-
-- `lws_service()` er IKKE traadsikker -- kun en traad maa kalde den
-- For at sende fra en anden traad: laeg i queue (mutex) + kald `lws_cancel_service()`
-- `lws_cancel_service()` er den ENESTE traadsikre lws-funktion
-- Den vaekker `lws_service()` sa den checker koeen
-
-Eksempel (LobbyClient::requestStart fra Qt main thread):
-```cpp
-void LobbyClient::requestStart() {
-    {
-        lock_guard<mutex> lk(queueMutex_);
-        outQueue_.push(MsgStartGame::build().dump());
-        pendingWake_ = true;
+void onClientReadyRead() {
+    auto* socket = qobject_cast<QTcpSocket*>(sender());
+    auto messages = readers_[socket].feed(socket->readAll());
+    for (const auto& raw : messages) {
+        onMessage(socket, raw);
     }
-    lws_cancel_service(context_);  // vaek lws traaden
 }
 ```
+
+`TcpFrameReader` akkumulerer bytes og returnerer faerdige beskeder.
+Den haandterer automatisk partial reads (hvis TCP splitter en besked
+over flere readyRead-events).
+
+### 4. Sende beskeder
+
+Med Qt Network er det meget simpelt — bare skriv direkte:
+
+```cpp
+void sendTo(QTcpSocket* socket, const json& msg) {
+    socket->write(frameMessage(msg.dump()));
+}
+```
+
+Ingen write-queue nødvendig (som med lws). Qt haandterer buffering internt.
+Man kan skrive til en QTcpSocket naar som helst fra Qt main thread.
+
+### 5. Qt event loop i stedet for blocking run()
+
+I stedet for en blocking `while(running) { poll(); }` loop bruger vi
+Qt's event loop:
+
+```cpp
+// Server:
+int main(int argc, char* argv[]) {
+    QCoreApplication app(argc, argv);
+    LobbyServer server(9000);
+    return app.exec();  // korer event loop
+}
+
+// Client: connectToServer() er non-blocking
+lobby->connectToServer();
+// ... Qt event loop (app.exec()) haandterer resten
+```
+
+## Fordele ved Qt Network vs libwebsockets
+
+| | libwebsockets (foer) | Qt Network (nu) |
+|---|---|---|
+| Event loop | Manuel `while(running_) lws_service(ctx, 50ms)` | Qt's built-in `app.exec()` |
+| Sende | Queue + `lws_callback_on_writable()` + `onWritable()` | `socket->write(...)` direkte |
+| Traade (client) | Separat `std::thread` for netvaerk | Korer i Qt main thread |
+| Traad-sikkerhed | `lws_cancel_service()` + mutex | Ikke nødvendig (samme traad) |
+| Callback-stil | Static function + global pointer trick | Qt signals/slots |
+| Framing | WebSocket framing (built-in) | Manual length-prefix (TcpFraming.hpp) |
 
 ## De 4 netvaerksklasser
 
-| Klasse | Rolle | Port | Traad |
-|--------|-------|------|-------|
-| LobbyServer | Server, modtager lobby-beskeder | 9000 | Main (eneste traad) |
-| LobbyClient | Client, forbinder til lobby | 9000 | Network thread |
-| GameRoom | Server, driver spillet | 900x | Main + game loop traad |
-| GameClient | Client, forbinder til spil | 900x | Network thread |
+| Klasse | Type | Port | Arver |
+|--------|------|------|-------|
+| LobbyServer | QTcpServer (server) | 9000 | QObject |
+| LobbyClient | QTcpSocket (client) | 9000 | QObject |
+| GameRoom | QTcpServer (server) | 900x | QObject |
+| GameClient | QTcpSocket (client) | 900x | QObject |
 
 Alle fire folger praecis det samme moenser ovenfor.
+
+## GameRoom: QTimer til polling
+
+GameRoom bruger en QTimer (5ms interval) til at polle game state
+fra fysik-traaden:
+
+```cpp
+pollTimer_ = new QTimer(this);
+pollTimer_->setInterval(5);
+connect(pollTimer_, &QTimer::timeout, this, &GameRoom::onPollTick);
+pollTimer_->start();
+
+void GameRoom::onPollTick() {
+    if (stateDirty_.exchange(false))
+        broadcastGameState();
+    if (pendingStopCountdown_ > 0 && --pendingStopCountdown_ == 0)
+        stop();
+}
+```
+
+## GameClient: QTimer til gyro
+
+Performer's GameClient bruger en QTimer (25ms, ~40Hz) til at
+streame gyroscope data:
+
+```cpp
+void GameClient::onConnected() {
+    // ...
+    if (role_ == Role::PERFORMER && gyro_) {
+        gyroTimer_ = new QTimer(this);
+        gyroTimer_->setInterval(25);
+        connect(gyroTimer_, &QTimer::timeout, this, &GameClient::onGyroTick);
+        gyroTimer_->start();
+    }
+}
+
+void GameClient::onGyroTick() {
+    auto angles = gyro_->read();
+    socket_->write(frameMessage(MsgGyroData::build(angles.pitch, angles.roll).dump()));
+}
+```

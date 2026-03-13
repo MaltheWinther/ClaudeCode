@@ -7,7 +7,7 @@ skinparam participantPadding 20
 
 actor "Performer\n(bin/client)" as P
 participant "GyroReader\n(BMI160 SPI)" as GYRO
-participant "GameClient\n(netvaerk)" as GC
+participant "GameClient\n(QTcpSocket)" as GC
 participant "GameRoom\n(bin/game_room)" as GR
 participant "GyroPiGame\n(fysik)" as GP
 participant "GameRoom\n(broadcast)" as GRB
@@ -24,7 +24,7 @@ loop Hvert 25ms
   GYRO -> GYRO: Laes BMI160 accelerometer\n+ gyroskop via SPI
   GYRO -> GYRO: Complementary filter:\npitch/roll vinkler
 
-  P -> GC: Laes angles fra GyroReader\n(mutex-beskyttet)
+  P -> GC: QTimer (25ms) -> laes GyroReader\n(mutex-beskyttet)
   GC -> GR: **gyro_data**\n{pitch: 12.5, roll: -8.3}
 
   note over GR: Gemmer gyro i gyro_\n(mutex-beskyttet)

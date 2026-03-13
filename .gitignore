@@ -7,5 +7,5 @@ build/
 # Claude Code
 .claude/settings.local.json
 
-# Personal docs (not rppi/docs)
-docs/
+# Personal docs at repo root (not rppi/docs)
+/docs/

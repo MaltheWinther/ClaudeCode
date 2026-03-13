@@ -9,14 +9,17 @@ hide empty methods
 ' ============ SERVER SIDE ============
 
 package "Server (bin/server)" #LightBlue {
-  class LobbyServer {
-    -port_ : int
+  class LobbyServer <<QObject>> {
+    -tcpServer_ : QTcpServer*
     -rooms_ : map<string, Room>
-    -clientRooms_ : map<lws*, string>
+    -clientRooms_ : map<QTcpSocket*, string>
+    -readers_ : map<QTcpSocket*, TcpFrameReader>
     -nextGamePort_ : int
     --
-    +run() : void
     +stop() : void
+    -onNewConnection() : slot
+    -onClientReadyRead() : slot
+    -onClientDisconnected() : slot
     -handleCreateRoom()
     -handleJoinRoom()
     -handleStartGame()
@@ -28,8 +31,8 @@ package "Server (bin/server)" #LightBlue {
     code : string
     hostName : string
     guestName : string
-    host : lws*
-    guest : lws*
+    host : QTcpSocket*
+    guest : QTcpSocket*
     state : WAITING|FULL|PLAYING
   }
 
@@ -37,14 +40,19 @@ package "Server (bin/server)" #LightBlue {
 }
 
 package "Game Room (bin/game_room)" #LightGreen {
-  class GameRoom {
+  class GameRoom <<QObject>> {
+    -tcpServer_ : QTcpServer*
+    -pollTimer_ : QTimer* (5ms)
     -roomCode_ : string
     -gameType_ : string
-    -performer_ : lws*
-    -communicator_ : lws*
+    -performer_ : QTcpSocket*
+    -communicator_ : QTcpSocket*
+    -readers_ : map<QTcpSocket*, TcpFrameReader>
     --
-    +run() : void
     +stop() : void
+    -onNewConnection() : slot
+    -onClientReadyRead() : slot
+    -onPollTick() : slot
     -handleIdentify()
     -handleGyroData()
     -handleNoteSubmit()
@@ -112,6 +120,14 @@ package "Common" #LightYellow {
     --
     LeaderboardEntry
   }
+
+  class "TcpFraming.hpp" as FRAMING {
+    +frameMessage(json) : QByteArray
+    TcpFrameReader::feed(data) : vector<string>
+    --
+    4-byte length-prefix framing
+    Maks besked: 64KB
+  }
 }
 
 ' ============ CLIENT SIDE ============
@@ -124,15 +140,18 @@ package "Client (bin/client)" #LightPink {
     --
     Al logik for skift mellem
     lobby -> spil -> game over
+    Ingen separate netvaerkstraade
   }
 
-  class LobbyClient {
+  class LobbyClient <<QObject>> {
+    -socket_ : QTcpSocket*
+    -reader_ : TcpFrameReader
     -host_, port_ : string, int
     -intent_ : CREATE|JOIN
     --
     +createRoom(username)
     +joinRoom(code, username)
-    +run() : blokkerende
+    +connectToServer() : non-blocking
     +stop()
     +requestStartWithGame(type)
     --
@@ -143,11 +162,14 @@ package "Client (bin/client)" #LightPink {
     onError_
   }
 
-  class GameClient {
+  class GameClient <<QObject>> {
+    -socket_ : QTcpSocket*
+    -reader_ : TcpFrameReader
+    -gyroTimer_ : QTimer* (25ms)
     -host_, port_ : string, int
     -role_ : string
     --
-    +run() : blokkerende
+    +connectToServer() : non-blocking
     +stop()
     +submitNotes(notes)
     --
@@ -225,11 +247,15 @@ MAIN --> AppWindow : ejer
 ' ============ RELATIONS ============
 
 LobbyServer ..> GameRoom : fork+exec
-LobbyClient ..> LobbyServer : WebSocket :9000
-GameClient ..> GameRoom : WebSocket :900x
+LobbyClient ..> LobbyServer : TCP :9000
+GameClient ..> GameRoom : TCP :900x
 MSG <.. LobbyServer : bruger
 MSG <.. LobbyClient : bruger
 MSG <.. GameRoom : bruger
 MSG <.. GameClient : bruger
+FRAMING <.. LobbyServer : bruger
+FRAMING <.. LobbyClient : bruger
+FRAMING <.. GameRoom : bruger
+FRAMING <.. GameClient : bruger
 
 @enduml

@@ -16,6 +16,7 @@ note over H: Indlaeser username fra\n~/.rppi_credentials\neller viser UsernameSc
 note over G: Samme flow
 
 == Fase 2: Opret rum ==
+note over H: lobby->connectToServer()\n(QTcpSocket, non-blocking)
 H -> LS: **create_room**\n{username: "Alice"}
 LS -> LS: Generer 4-tegn kode\n(fx "X7K3")
 LS --> H: **room_created**\n{code: "X7K3"}
@@ -23,6 +24,7 @@ note over H: Viser LobbyScreen\nmed kode "X7K3"\nog venter pa guest
 
 == Fase 3: Join rum ==
 note over G: Bruger indtaster kode "X7K3"
+note over G: lobby->connectToServer()\n(QTcpSocket, non-blocking)
 G -> LS: **join_room**\n{code: "X7K3", username: "Bob"}
 LS --> G: **room_joined**\n{code: "X7K3"}
 LS --> H: **player_joined**\n{count: 2, host: "Alice", guest: "Bob"}
@@ -44,7 +46,9 @@ note over H: RoleScreen: "You are PERFORMER"\n3... 2... 1...
 note over G: RoleScreen: "You are COMMUNICATOR"\n3... 2... 1...
 
 == Fase 5: Forbind til GameRoom ==
-note over GR: Lytter pa port 9001\nVenter pa begge spillere
+note over GR: QTcpServer lytter pa port 9001\nVenter pa begge spillere
+note over H: QTimer::singleShot(500ms)\n-> game->connectToServer()
+note over G: QTimer::singleShot(500ms)\n-> game->connectToServer()
 
 H -> GR: **identify**\n{role: "performer"}
 G -> GR: **identify**\n{role: "communicator"}

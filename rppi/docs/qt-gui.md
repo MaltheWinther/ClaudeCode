@@ -54,37 +54,52 @@ Qt's signal/slot system er event-drevet kommunikation:
    QObject::connect(&window, &AppWindow::hostRoomClicked, [&]() {
        lobby = new LobbyClient(serverIp, 9000);
        lobby->createRoom(username);
-       netThread = std::thread([lp = lobby] { lp->run(); });
+       lobby->connectToServer();  // non-blocking
    });
    ```
 
 **Kaedefoelge**: Screen -> AppWindow -> main.cpp lambda
 Hver skaerm kender KUN til sine egne signals -- den ved ikke hvad der sker naar signalet fires.
 
-## Traad-sikkerhed: QMetaObject::invokeMethod
+## Traad-sikkerhed: Netvaerk i Qt main thread
 
-**Problem**: Netvaerkstraaden modtager data, men UI maa kun opdateres fra Qt main thread.
-
-**Loesning**: `QMetaObject::invokeMethod` med `Qt::QueuedConnection`:
+Netvaerksklasserne (LobbyClient, GameClient) arver QObject og bruger
+QTcpSocket. De korer i Qt's event loop, sa callbacks korer direkte i
+main thread. **Der er derfor IKKE behov for QMetaObject::invokeMethod
+til netvaerksdata.**
 
 ```cpp
-// I netvaerkstraaden (GameClient callback):
-game->setOnGameState([&window](MsgGameState gs) {
+// Callbacks korer direkte i Qt main thread:
+lobby->setOnRoomCreated([&window](std::string code) {
+    window.showLobbyHost(QString::fromStdString(code), 1);
+});
+
+game->setOnGameOver([&window, &gyro, &noteReader, &gameType]
+                    (bool win, int elapsed, int levels,
+                     std::vector<LeaderboardEntry> lb) {
+    gyro.stop();
+    noteReader.stop();
+    window.showGameOver(win, elapsed, levels, lb,
+                        QString::fromStdString(gameType));
+});
+```
+
+### Undtagelse: NoteReader
+
+NoteReader korer i sin egen traad (audio-processing), sa den bruger
+stadig `QMetaObject::invokeMethod` for at poste detekterede noter
+til Qt main thread:
+
+```cpp
+noteReader.setOnNoteDetected([&window](NoteReader::NoteEvent ev) {
     QMetaObject::invokeMethod(&window,
-        [&window, gs]() {
-            window.updateGameState(gs.ballX, gs.ballY, ...);
+        [&window, n = std::move(ev.note)]() mutable {
+            window.addDetectedNote(QString::fromStdString(n));
         }, Qt::QueuedConnection);
 });
 ```
 
-Hvad sker der:
-1. Netvaerkstraaden opretter en lambda med en KOPI af data
-2. `invokeMethod` laegger lambdaen i Qt's event queue
-3. Naar Qt main thread naar til den, koerer lambdaen
-4. UI opdateres sikkert fra den rigtige traad
-
 **Qt::QueuedConnection** = "koer senere i modtagerens traad"
-**Qt::DirectConnection** = "koer nu i denne traad" (farligt for UI!)
 
 ## Skaerm-oversigt
 
@@ -148,8 +163,22 @@ MOC genererer ekstra C++ kode der muliggoer signals/slots.
 
 I Makefile:
 ```makefile
+# Client UI screens
 client/ui/%.moc.cpp: client/ui/%.hpp
 	$(MOC) $(QT_CFLAGS) $< -o $@
+
+# Client netvaerksklasser (QObject)
+client/%.moc.cpp: client/%.hpp
+	$(MOC) $(QT_CFLAGS) $< -o $@
+
+# Server netvaerksklasser (QObject)
+server/%.moc.cpp: server/%.hpp
+	$(MOC) $(SERVER_QT_CFLAGS) $< -o $@
 ```
+
+Klasser der kræver MOC:
+- **Client UI** (9 stk): AppWindow, UsernameScreen, MainMenuScreen, LobbyScreen, GameSelectScreen, RoleScreen, GameScreen, NotePiScreen, GameOverScreen
+- **Client netvaerk** (2 stk): LobbyClient, GameClient
+- **Server** (2 stk): LobbyServer, GameRoom
 
 Disse `.moc.cpp` filer kompileres og linkes med resten.

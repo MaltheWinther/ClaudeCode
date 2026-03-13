@@ -1,0 +1,70 @@
+@startuml System Sequence Diagram
+
+title Systemsekvensdiagram: Komplet spilflow
+
+skinparam sequenceArrowThickness 2
+skinparam participantPadding 30
+skinparam sequenceGroupBorderColor #888888
+
+actor "Host" as H
+participant "System\n(Server + GameRoom)" as S
+actor "Guest" as G
+
+== Opret rum ==
+H -> S: startApp(serverIp)
+H -> S: createRoom(username)
+S --> H: roomCreated(code)
+
+== Join rum ==
+G -> S: startApp(serverIp)
+G -> S: joinRoom(code, username)
+S --> H: playerJoined(count, hostName, guestName)
+S --> G: playerJoined(count, hostName, guestName)
+
+== Vaelg spil og start ==
+H -> S: startGame(gameType)
+S -> S: tildelRoller()
+S --> H: roleAssigned(role, gamePort, gameType)
+S --> G: roleAssigned(role, gamePort, gameType)
+
+alt gameType == "gyropi"
+
+  == GyroPi: Spil-loop ==
+  H -> S: identify(role)
+  G -> S: identify(role)
+
+  loop Performer sender gyro ved ~40Hz
+    H -> S: gyroData(pitch, roll)
+    S --> H: gameState(ballX, ballY, pitch, roll, level)
+    S --> G: gameState(ballX, ballY, pitch, roll, level)
+  end
+
+  note over S: Bold naar maal\n(eller tid/levels udloebt)
+
+  S --> H: gameOver(win, elapsedSecs, levelsReached, leaderboard)
+  S --> G: gameOver(win, elapsedSecs, levelsReached, leaderboard)
+
+else gameType == "notepi"
+
+  == NotePi: Spil-loop ==
+  H -> S: identify(role)
+  G -> S: identify(role)
+
+  loop Indtil alle 5 noter er korrekte
+    H -> S: noteSubmit(notes[5])
+    S --> H: noteState(attempt, colors, correct, history)
+    S --> G: noteState(attempt, colors, correct, history)
+  end
+
+  note over S: Alle noter korrekte
+
+  S --> H: gameOver(win, elapsedSecs, attempts, leaderboard)
+  S --> G: gameOver(win, elapsedSecs, attempts, leaderboard)
+
+end
+
+== Afslutning ==
+note over H: Viser resultat + leaderboard\n"Play Again" eller "Exit"
+note over G: Viser resultat + leaderboard\n"Play Again" eller "Exit"
+
+@enduml

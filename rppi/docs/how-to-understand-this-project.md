@@ -7,7 +7,7 @@
 3. **Class Overview** (class-overview.png) — Alle klasser og deres relationer
 4. **NotePi / GyroPi Game Flow** (sequence-notepi.png / sequence-gyropi.png) — Spil-flowet trin for trin
 5. **Client Thread Model** (sequence-client-threads.png) — Hvordan traadene kommunikerer
-6. **Dybdegaaende docs** — websocket-pattern.md, qt-gui.md, pitch-detection.md, gyropi-physics.md
+6. **Dybdegaaende docs** — tcp-network-pattern (websocket-pattern.md), qt-gui.md, pitch-detection.md, gyropi-physics.md
 7. **Koden** — Nu ved du praecis hvilken fil du skal aabne og hvad den goer
 
 ## Tips
