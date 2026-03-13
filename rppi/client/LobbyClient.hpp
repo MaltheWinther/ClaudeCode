@@ -1,62 +1,51 @@
 #pragma once
 
 #include <string>
-#include <queue>
-#include <mutex>
-#include <atomic>
 #include <functional>
-#include <libwebsockets.h>
+#include <QObject>
+#include <QTcpSocket>
 #include "../common/Messages.hpp"
+#include "../common/TcpFraming.hpp"
 
-// Connects to LobbyServer, handles room create/join, and blocks in run()
-// until a role is assigned (or an error occurs).
-//
-// Designed to run in a background thread.
-// All callbacks are invoked from that thread — use Qt::QueuedConnection
-// (via QMetaObject::invokeMethod) to safely update the UI from them.
-//
-// requestStart() is thread-safe and can be called from the Qt main thread.
+// Connects to LobbyServer via QTcpSocket. Non-blocking — runs in Qt event loop.
+// Call connectToServer() after setting intent and callbacks.
 
-class LobbyClient {
+class LobbyClient : public QObject {
+    Q_OBJECT
 public:
-    LobbyClient(const std::string& host, int port);
-    ~LobbyClient();
+    LobbyClient(const std::string& host, int port, QObject* parent = nullptr);
 
     void createRoom(const std::string& username);
     void joinRoom(const std::string& code, const std::string& username);
-    void run();          // blocking — call from a background thread
-    void stop();         // signal run() to exit
-    void requestStart(); // thread-safe — sends START_GAME from any thread
-    void requestStartWithGame(const std::string& gameType); // sends START_GAME with game type
+    void connectToServer();   // non-blocking — starts async connect
+    void stop();
+
+    void requestStart();
+    void requestStartWithGame(const std::string& gameType);
 
     std::string getRoomCode() const { return roomCode_; }
     std::string getRole()     const { return role_; }
     int         getGamePort() const { return gamePort_; }
 
-    // Callbacks (set before calling run())
+    // Callbacks (set before calling connectToServer())
     void setOnRoomCreated (std::function<void(std::string code)>                        cb) { onRoomCreated_  = std::move(cb); }
     void setOnPlayerJoined(std::function<void(int, std::string, std::string)>           cb) { onPlayerJoined_ = std::move(cb); }
     void setOnRoleAssigned(std::function<void(std::string, int port, std::string game)> cb) { onRoleAssigned_ = std::move(cb); }
     void setOnError       (std::function<void(std::string msg)>                         cb) { onError_        = std::move(cb); }
 
-    static int wsCallback(lws* wsi, lws_callback_reasons reason,
-                          void* user, void* in, size_t len);
+private slots:
+    void onConnected();
+    void onReadyRead();
+    void onDisconnected();
+    void onSocketError(QAbstractSocket::SocketError err);
+
 private:
-    void onConnect(lws* wsi);
     void onMessage(const std::string& raw);
-    void onWritable(lws* wsi);
-    void onError();
-    void onWaitCancelled();
 
     std::string  host_;
     int          port_;
-    bool         running_  = false;
-    lws_context* context_  = nullptr;
-    lws*         wsi_      = nullptr;
-
-    std::queue<std::string> outQueue_;
-    std::mutex              queueMutex_;
-    std::atomic<bool>       pendingWake_{ false };
+    QTcpSocket*  socket_ = nullptr;
+    TcpFrameReader reader_;
 
     enum class Intent { CREATE, JOIN } intent_ = Intent::CREATE;
     std::string joinCode_;

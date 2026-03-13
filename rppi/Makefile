@@ -4,8 +4,12 @@ CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -pthread -fpermissive
 # ── Qt setup ──────────────────────────────────────────────────────────────────
 # On Raspberry Pi:  sudo apt install qt6-base-dev
 # On macOS:         brew install qt && export PKG_CONFIG_PATH=...
-QT_CFLAGS := $(shell pkg-config --cflags Qt6Core Qt6Widgets Qt6Gui 2>/dev/null)
-QT_LIBS   := $(shell pkg-config --libs   Qt6Core Qt6Widgets Qt6Gui 2>/dev/null)
+QT_CFLAGS := $(shell pkg-config --cflags Qt6Core Qt6Widgets Qt6Gui Qt6Network 2>/dev/null)
+QT_LIBS   := $(shell pkg-config --libs   Qt6Core Qt6Widgets Qt6Gui Qt6Network 2>/dev/null)
+
+# Server only needs Core + Network (no Widgets/Gui)
+SERVER_QT_CFLAGS := $(shell pkg-config --cflags Qt6Core Qt6Network 2>/dev/null)
+SERVER_QT_LIBS   := $(shell pkg-config --libs   Qt6Core Qt6Network 2>/dev/null)
 
 # moc binary: override with  make MOC=/path/to/moc  if needed
 # macOS homebrew path: /opt/homebrew/share/qt/libexec/moc
@@ -28,8 +32,8 @@ CLIENT_INC := $(INC) -Iclient
 
 # ── Compile flags ─────────────────────────────────────────────────────────────
 CLIENT_CXXFLAGS := $(CXXFLAGS) $(QT_CFLAGS)
+SERVER_CXXFLAGS := $(CXXFLAGS) $(SERVER_QT_CFLAGS)
 
-LWS_LIB    := $(BREW_LIB) -lwebsockets
 # BMI160Wrapper is only available on RPi (ecesyshat install); skip on macOS
 UNAME := $(shell uname)
 BMI_LIB    := $(if $(filter Linux,$(UNAME)),-lBMI160Wrapper)
@@ -48,7 +52,8 @@ OBJDIR := obj
 $(shell mkdir -p $(BINDIR) $(OBJDIR))
 
 # ── Q_OBJECT headers that need moc processing ─────────────────────────────────
-MOC_HEADERS := \
+# Client UI moc headers
+MOC_CLIENT_UI_HEADERS := \
     client/ui/AppWindow.hpp \
     client/ui/UsernameScreen.hpp \
     client/ui/MainMenuScreen.hpp \
@@ -59,23 +64,45 @@ MOC_HEADERS := \
     client/ui/NotePiScreen.hpp \
     client/ui/GameOverScreen.hpp
 
-MOC_SRCS := $(MOC_HEADERS:%.hpp=%.moc.cpp)
+# Client network moc headers (new QObject classes)
+MOC_CLIENT_NET_HEADERS := \
+    client/LobbyClient.hpp \
+    client/GameClient.hpp
 
-# Pattern rule: generate moc source from header
+# Server moc headers (new QObject classes)
+MOC_SERVER_HEADERS := \
+    server/LobbyServer.hpp \
+    server/GameRoom.hpp
+
+MOC_CLIENT_UI_SRCS  := $(MOC_CLIENT_UI_HEADERS:%.hpp=%.moc.cpp)
+MOC_CLIENT_NET_SRCS := $(MOC_CLIENT_NET_HEADERS:%.hpp=%.moc.cpp)
+
+MOC_LOBBY_SERVER_SRC := server/LobbyServer.moc.cpp
+MOC_GAME_ROOM_SRC   := server/GameRoom.moc.cpp
+
+# Pattern rules: generate moc source from header
 client/ui/%.moc.cpp: client/ui/%.hpp
 	$(MOC) $(QT_CFLAGS) $< -o $@
+
+client/%.moc.cpp: client/%.hpp
+	$(MOC) $(QT_CFLAGS) $< -o $@
+
+server/%.moc.cpp: server/%.hpp
+	$(MOC) $(SERVER_QT_CFLAGS) $< -o $@
 
 # ── Source lists ──────────────────────────────────────────────────────────────
 SERVER_SRCS := \
     server/main.cpp \
-    server/LobbyServer.cpp
+    server/LobbyServer.cpp \
+    $(MOC_LOBBY_SERVER_SRC)
 
 ROOM_SRCS := \
     server/game_room/main.cpp \
     server/GameRoom.cpp \
     server/GyroPiGame.cpp \
     server/NotePiGame.cpp \
-    server/Leaderboard.cpp
+    server/Leaderboard.cpp \
+    $(MOC_GAME_ROOM_SRC)
 
 CLIENT_SRCS := \
     client/main.cpp \
@@ -93,7 +120,8 @@ CLIENT_SRCS := \
     client/ui/GameScreen.cpp \
     client/ui/NotePiScreen.cpp \
     client/ui/GameOverScreen.cpp \
-    $(MOC_SRCS)
+    $(MOC_CLIENT_UI_SRCS) \
+    $(MOC_CLIENT_NET_SRCS)
 
 # ── Object files (in obj/ to avoid naming conflicts) ──────────────────────────
 SERVER_OBJS := $(SERVER_SRCS:%.cpp=$(OBJDIR)/%.o)
@@ -108,18 +136,18 @@ all: server game_room client
 server: $(BINDIR)/server
 
 $(BINDIR)/server: $(SERVER_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LWS_LIB) $(THREAD_LIB)
+	$(CXX) $(SERVER_CXXFLAGS) -o $@ $^ $(SERVER_QT_LIBS) $(THREAD_LIB)
 
 game_room: $(BINDIR)/game_room
 
 $(BINDIR)/game_room: $(ROOM_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LWS_LIB) $(THREAD_LIB)
+	$(CXX) $(SERVER_CXXFLAGS) -o $@ $^ $(SERVER_QT_LIBS) $(THREAD_LIB)
 
 client: $(BINDIR)/client
 
 $(BINDIR)/client: $(CLIENT_OBJS)
 	$(CXX) $(CLIENT_CXXFLAGS) -o $@ $^ \
-	    $(LWS_LIB) $(BMI_LIB) $(AUBIO_LIB) $(THREAD_LIB) $(QT_LIBS)
+	    $(BREW_LIB) $(BMI_LIB) $(AUBIO_LIB) $(THREAD_LIB) $(QT_LIBS)
 
 # ── Compile rules ─────────────────────────────────────────────────────────────
 # Client rule (Qt flags) — more specific, matched before the generic rule below
@@ -127,11 +155,11 @@ $(OBJDIR)/client/%.o: client/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CLIENT_CXXFLAGS) $(CLIENT_INC) -c $< -o $@
 
-# Generic rule (server + game_room — no Qt needed)
-$(OBJDIR)/%.o: %.cpp
+# Server rule (Qt Core + Network flags)
+$(OBJDIR)/server/%.o: server/%.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(INC) -c $< -o $@
+	$(CXX) $(SERVER_CXXFLAGS) $(INC) -c $< -o $@
 
 # ── Clean ─────────────────────────────────────────────────────────────────────
 clean:
-	rm -rf $(BINDIR) $(OBJDIR) $(MOC_SRCS)
+	rm -rf $(BINDIR) $(OBJDIR) $(MOC_CLIENT_UI_SRCS) $(MOC_CLIENT_NET_SRCS) $(MOC_LOBBY_SERVER_SRC) $(MOC_GAME_ROOM_SRC)

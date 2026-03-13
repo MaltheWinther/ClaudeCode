@@ -32,8 +32,8 @@ void NoteReader::setOnNoteDetected(std::function<void(NoteEvent)> cb) {
 }
 
 std::string NoteReader::frequencyToNote(float freq) const {
-    // C2 (65 Hz) to C8 (4186 Hz) — covers nearly all piano keys
-    if (freq < 65.0f || freq > 4200.0f) return "";
+    // C3 (131 Hz) to B6 (1976 Hz) — practical range for phone speakers
+    if (freq < 131.0f || freq > 2000.0f) return "";
 
     static const char* noteNames[] = {
         "C", "C#", "D", "D#", "E", "F",

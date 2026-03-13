@@ -1,7 +1,5 @@
 #include <QApplication>
-#include <QMetaObject>
-#include <thread>
-#include <chrono>
+#include <QTimer>
 #include <string>
 #include <vector>
 
@@ -14,15 +12,14 @@
 #include "../common/Messages.hpp"
 
 // Usage: ./client <server_ip> [username]
-//   Optional username bypasses saved credentials (useful for testing 2 clients on same machine)
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <server_ip> [username]\n", argv[0]);
         return 1;
     }
-    const std::string serverIp      = argv[1];
-    const std::string cliUsername   = (argc >= 3) ? argv[2] : "";
+    const std::string serverIp    = argv[1];
+    const std::string cliUsername  = (argc >= 3) ? argv[2] : "";
 
     QApplication app(argc, argv);
     app.setStyle("Fusion");
@@ -42,16 +39,9 @@ int main(int argc, char* argv[]) {
     GameClient*  game      = nullptr;
     GyroReader   gyro;
     NoteReader   noteReader;
-    std::thread  netThread;
-
-    // Join and discard the current network thread (safe after it has stopped)
-    auto joinNetThread = [&] {
-        if (netThread.joinable()) netThread.join();
-    };
 
     // ── USERNAME PHASE ───────────────────────────────────────────────────────
     if (!cliUsername.empty()) {
-        // CLI override: skip credential file, go straight to main menu
         username = cliUsername;
         window.showMainMenu(QString::fromStdString(username));
     } else {
@@ -75,68 +65,52 @@ int main(int argc, char* argv[]) {
         window.showMainMenu(u);
     });
 
-    // ── Lobby callback setup (shared by host and guest) ───────────────────────
+    // ── Lobby callback setup (shared by host and guest) ──────────────────────
     auto setupLobbyCallbacks = [&]() {
         lobby->setOnRoomCreated([&window](std::string code) {
-            QMetaObject::invokeMethod(&window,
-                [&window, c = std::move(code)]() mutable {
-                    window.showLobbyHost(QString::fromStdString(c), 1);
-                }, Qt::QueuedConnection);
+            window.showLobbyHost(QString::fromStdString(code), 1);
         });
 
         lobby->setOnPlayerJoined([&window](int count, std::string h, std::string g) {
-            QMetaObject::invokeMethod(&window,
-                [&window, count, h = std::move(h), g = std::move(g)]() mutable {
-                    window.updateLobbyPlayers(count,
-                        QString::fromStdString(h), QString::fromStdString(g));
-                }, Qt::QueuedConnection);
+            window.updateLobbyPlayers(count,
+                QString::fromStdString(h), QString::fromStdString(g));
         });
 
-        // Write role/gamePort/gameType in the Qt main thread to avoid data races
         lobby->setOnRoleAssigned([&window, &role, &gamePort, &gameType]
                                  (std::string r, int port, std::string gt) {
-            QMetaObject::invokeMethod(&window,
-                [&window, &role, &gamePort, &gameType,
-                 r = std::move(r), port, gt = std::move(gt)]() mutable {
-                    role     = r;
-                    gamePort = port;
-                    gameType = gt;  // set from server (important for guest)
-                    window.showRole(QString::fromStdString(r),
-                                    QString::fromStdString(gameType));
-                }, Qt::QueuedConnection);
+            role     = r;
+            gamePort = port;
+            gameType = gt;
+            window.showRole(QString::fromStdString(r),
+                            QString::fromStdString(gameType));
         });
 
         lobby->setOnError([&window, &username](std::string msg) {
-            QMetaObject::invokeMethod(&window,
-                [&window, &username, m = std::move(msg)]() mutable {
-                    window.showMainMenu(QString::fromStdString(username));
-                    window.setMainMenuError(QString::fromStdString(m));
-                }, Qt::QueuedConnection);
+            window.showMainMenu(QString::fromStdString(username));
+            window.setMainMenuError(QString::fromStdString(msg));
         });
     };
 
     // ── HOST ROOM ────────────────────────────────────────────────────────────
     QObject::connect(&window, &AppWindow::hostRoomClicked, [&]() {
         isHost = true;
-        joinNetThread();
         delete lobby;
         lobby = new LobbyClient(serverIp, 9000);
         setupLobbyCallbacks();
         lobby->createRoom(username);
-        netThread = std::thread([lp = lobby] { lp->run(); });
+        lobby->connectToServer();
     });
 
     // ── JOIN ROOM ────────────────────────────────────────────────────────────
     QObject::connect(&window, &AppWindow::joinRoomClicked,
                      [&](const QString& code) {
         isHost = false;
-        joinNetThread();
         delete lobby;
         lobby = new LobbyClient(serverIp, 9000);
         setupLobbyCallbacks();
         lobby->joinRoom(code.toStdString(), username);
         window.showLobbyGuest(code);
-        netThread = std::thread([lp = lobby] { lp->run(); });
+        lobby->connectToServer();
     });
 
     // ── HOST PRESSES PLAY → GAME SELECT SCREEN ──────────────────────────────
@@ -144,14 +118,14 @@ int main(int argc, char* argv[]) {
         window.showGameSelect(isHost);
     });
 
-    // ── GAME SELECTED (host picks) → SEND START_GAME WITH GAME TYPE ─────────
+    // ── GAME SELECTED → SEND START_GAME WITH GAME TYPE ──────────────────────
     QObject::connect(&window, &AppWindow::gameSelected,
                      [&](const QString& gt) {
         gameType = gt.toStdString();
         if (lobby) lobby->requestStartWithGame(gameType);
     });
 
-    // ── ROLE SCREEN AUTO-ADVANCES → START GAME ───────────────────────────────
+    // ── ROLE SCREEN AUTO-ADVANCES → START GAME ──────────────────────────────
     QObject::connect(&window, &AppWindow::roleDisplayDone, [&]() {
         if (gameType == "notepi") {
             window.showNotePiGame(QString::fromStdString(role));
@@ -170,54 +144,37 @@ int main(int argc, char* argv[]) {
             if (role == Role::PERFORMER) gyro.start();
         }
 
-        joinNetThread();  // join lobby thread (exits quickly after role assigned)
         delete game;
         game = new GameClient(serverIp, gamePort, role,
                               (gameType != "notepi" && role == Role::PERFORMER) ? &gyro : nullptr);
 
         game->setOnGameState([&window](MsgGameState gs) {
-            QMetaObject::invokeMethod(&window,
-                [&window, gs]() {
-                    window.updateGameState(gs.ballX, gs.ballY,
-                                           gs.pitch, gs.roll, gs.level);
-                }, Qt::QueuedConnection);
+            window.updateGameState(gs.ballX, gs.ballY,
+                                   gs.pitch, gs.roll, gs.level);
         });
 
         game->setOnNoteState([&window](MsgNoteState ns) {
-            QMetaObject::invokeMethod(&window,
-                [&window, ns = std::move(ns)]() mutable {
-                    window.updateNoteState(ns);
-                }, Qt::QueuedConnection);
+            window.updateNoteState(ns);
         });
 
         game->setOnGameOver([&window, &gyro, &noteReader, &gameType]
                             (bool win, int elapsed, int levels,
                              std::vector<LeaderboardEntry> lb) {
-            // Don't block the network thread with stop() calls —
-            // do all cleanup in the Qt main thread instead
-            QMetaObject::invokeMethod(&window,
-                [&window, &gyro, &noteReader, win, elapsed, levels,
-                 lb = std::move(lb), gt = std::string(gameType)]() mutable {
-                    gyro.stop();
-                    noteReader.stop();
-                    window.showGameOver(win, elapsed, levels, lb,
-                                        QString::fromStdString(gt));
-                }, Qt::QueuedConnection);
+            gyro.stop();
+            noteReader.stop();
+            window.showGameOver(win, elapsed, levels, lb,
+                                QString::fromStdString(gameType));
         });
 
         game->setOnError([&window, &gyro, &noteReader](std::string msg) {
-            QMetaObject::invokeMethod(&window,
-                [&window, &gyro, &noteReader, m = std::move(msg)]() mutable {
-                    gyro.stop();
-                    noteReader.stop();
-                    window.showDisconnect(QString::fromStdString(m));
-                }, Qt::QueuedConnection);
+            gyro.stop();
+            noteReader.stop();
+            window.showDisconnect(QString::fromStdString(msg));
         });
 
-        // Sleep 500 ms in the network thread so game_room has time to bind
-        netThread = std::thread([gp = game]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            gp->run();
+        // Delay connect by 500ms so game_room has time to bind its port
+        QTimer::singleShot(500, game, [gp = game]() {
+            gp->connectToServer();
         });
     });
 
@@ -229,7 +186,7 @@ int main(int argc, char* argv[]) {
 
     // ── EXIT LOBBY → STOP LOBBY, BACK TO MAIN MENU ─────────────────────────
     QObject::connect(&window, &AppWindow::exitLobbyClicked, [&]() {
-        if (lobby) { lobby->stop(); joinNetThread(); delete lobby; lobby = nullptr; }
+        if (lobby) { lobby->stop(); delete lobby; lobby = nullptr; }
         window.showMainMenu(QString::fromStdString(username));
     });
 
@@ -237,19 +194,18 @@ int main(int argc, char* argv[]) {
     QObject::connect(&window, &AppWindow::exitGameClicked, [&]() {
         gyro.stop();
         noteReader.stop();
-        if (game) { game->stop(); joinNetThread(); delete game; game = nullptr; }
+        if (game) { game->stop(); delete game; game = nullptr; }
         window.showMainMenu(QString::fromStdString(username));
     });
 
-    // ── PLAY AGAIN → BACK TO MAIN MENU ───────────────────────────────────────
+    // ── PLAY AGAIN → BACK TO MAIN MENU ──────────────────────────────────────
     QObject::connect(&window, &AppWindow::playAgainClicked, [&]() {
         window.showMainMenu(QString::fromStdString(username));
     });
 
-    // ── Run Qt event loop ─────────────────────────────────────────────────────
+    // ── Run Qt event loop ────────────────────────────────────────────────────
     int ret = app.exec();
 
-    joinNetThread();
     delete game;
     delete lobby;
     return ret;

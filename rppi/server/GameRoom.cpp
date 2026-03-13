@@ -4,146 +4,109 @@
 
 #include <iostream>
 #include <chrono>
-#include <cstring>
 #include <ctime>
-
-static GameRoom* s_instance = nullptr;
+#include <QCoreApplication>
 
 // ── Constructor / Destructor ─────────────────────────────────────────────────
 
 GameRoom::GameRoom(const std::string& roomCode, int port,
                    const std::string& hostName, const std::string& guestName,
-                   const std::string& gameType)
-    : roomCode_(roomCode), port_(port),
+                   const std::string& gameType, QObject* parent)
+    : QObject(parent), roomCode_(roomCode), port_(port),
       players_(hostName.empty() ? "Unknown" : hostName + " & " + guestName),
       gameType_(gameType)
 {
-    s_instance = this;
+    tcpServer_ = new QTcpServer(this);
+    connect(tcpServer_, &QTcpServer::newConnection,
+            this, &GameRoom::onNewConnection);
 
-    lws_protocols protocols[] = {
-        { "rppi-game", GameRoom::wsCallback, 0, 4096, 0, nullptr, 0 },
-        { nullptr, nullptr, 0, 0, 0, nullptr, 0 }
-    };
+    if (!tcpServer_->listen(QHostAddress::Any, port_)) {
+        throw std::runtime_error("Failed to listen on port " + std::to_string(port_));
+    }
 
-    lws_context_creation_info info{};
-    info.port      = port_;
-    info.protocols = protocols;
-
-    context_ = lws_create_context(&info);
-    if (!context_)
-        throw std::runtime_error("Failed to create GameRoom context");
+    // Poll timer replaces the while-loop in the old run()
+    pollTimer_ = new QTimer(this);
+    pollTimer_->setInterval(5);
+    connect(pollTimer_, &QTimer::timeout, this, &GameRoom::onPollTick);
+    pollTimer_->start();
 
     std::cout << "[Room " << roomCode_ << "] Listening on port " << port_ << "\n";
 }
 
 GameRoom::~GameRoom() {
-    if (context_) lws_context_destroy(context_);
-}
-
-// ── Public interface ─────────────────────────────────────────────────────────
-
-void GameRoom::run() {
-    running_ = true;
-
-    while (running_) {
-        lws_service(context_, 5);   // 5ms max — keeps loop responsive
-
-        // If game loop has produced a new state, broadcast it from this thread
-        if (stateDirty_.exchange(false)) {
-            broadcastGameState();
-        }
-
-        // Delayed stop: give lws iterations to flush final messages
-        if (pendingStopCountdown_ > 0) {
-            if (--pendingStopCountdown_ == 0) {
-                stop();
-            }
-        }
-    }
-
     if (gameThread_.joinable())
         gameThread_.join();
 }
 
 void GameRoom::stop() {
-    running_ = false;
-}
-
-// ── Static lws callback ──────────────────────────────────────────────────────
-
-int GameRoom::wsCallback(lws* wsi, lws_callback_reasons reason,
-                          void* /*user*/, void* in, size_t len) {
-    if (!s_instance) return 0;
-
-    switch (reason) {
-        case LWS_CALLBACK_ESTABLISHED:
-            s_instance->onConnect(wsi);
-            break;
-        case LWS_CALLBACK_RECEIVE:
-            s_instance->onMessage(wsi, std::string(static_cast<char*>(in), len));
-            break;
-        case LWS_CALLBACK_SERVER_WRITEABLE:
-            s_instance->onWritable(wsi);
-            break;
-        case LWS_CALLBACK_CLOSED:
-            s_instance->onDisconnect(wsi);
-            break;
-        default:
-            break;
+    pollTimer_->stop();
+    tcpServer_->close();
+    if (gameThread_.joinable()) {
+        // Signal game loop to stop, then join
+        stateDirty_ = false;  // prevent further broadcasts
+        game_.reset();         // causes gameLoopThread to exit
     }
-    return 0;
+    QCoreApplication::quit();
 }
 
-// ── Event handlers ───────────────────────────────────────────────────────────
+// ── Poll tick (replaces blocking run() loop) ─────────────────────────────────
 
-void GameRoom::onConnect(lws* wsi) {
-    writeQueues_[wsi];  // initialise empty queue
-    std::cout << "[Room " << roomCode_ << "] Client connected, waiting for identify\n";
+void GameRoom::onPollTick() {
+    if (stateDirty_.exchange(false)) {
+        broadcastGameState();
+    }
+
+    if (pendingStopCountdown_ > 0) {
+        if (--pendingStopCountdown_ == 0) {
+            stop();
+        }
+    }
 }
 
-void GameRoom::onMessage(lws* wsi, const std::string& raw) {
-    std::string type;
-    try { type = getMsgType(raw); }
-    catch (...) { sendTo(wsi, MsgError::build("Invalid JSON")); return; }
+// ── Connection handling ──────────────────────────────────────────────────────
 
-    const json j = json::parse(raw);
-
-    if      (type == MsgType::IDENTIFY)    handleIdentify(wsi, j);
-    else if (type == MsgType::GYRO_DATA)  handleGyroData(wsi, j);
-    else if (type == MsgType::NOTE_SUBMIT) handleNoteSubmit(wsi, j);
-    else    sendTo(wsi, MsgError::build("Unknown message type in game: " + type));
+void GameRoom::onNewConnection() {
+    while (QTcpSocket* socket = tcpServer_->nextPendingConnection()) {
+        readers_[socket];
+        connect(socket, &QTcpSocket::readyRead,
+                this, &GameRoom::onClientReadyRead);
+        connect(socket, &QTcpSocket::disconnected,
+                this, &GameRoom::onClientDisconnected);
+        std::cout << "[Room " << roomCode_ << "] Client connected, waiting for identify\n";
+    }
 }
 
-void GameRoom::onWritable(lws* wsi) {
-    auto& queue = writeQueues_[wsi];
-    if (queue.empty()) return;
+void GameRoom::onClientReadyRead() {
+    auto* socket = qobject_cast<QTcpSocket*>(sender());
+    if (!socket) return;
 
-    const std::string& msg = queue.front();
-    std::vector<unsigned char> buf(LWS_PRE + msg.size());
-    std::memcpy(buf.data() + LWS_PRE, msg.data(), msg.size());
-    lws_write(wsi, buf.data() + LWS_PRE, msg.size(), LWS_WRITE_TEXT);
+    auto it = readers_.find(socket);
+    if (it == readers_.end()) return;
 
-    queue.pop();
-    if (!queue.empty())
-        lws_callback_on_writable(wsi);
+    auto messages = it->second.feed(socket->readAll());
+    for (const auto& raw : messages) {
+        onMessage(socket, raw);
+    }
 }
 
-void GameRoom::onDisconnect(lws* wsi) {
-    // Notify the remaining player before cleaning up
-    lws* remaining = nullptr;
-    if (wsi == performer_) {
+void GameRoom::onClientDisconnected() {
+    auto* socket = qobject_cast<QTcpSocket*>(sender());
+    if (!socket) return;
+
+    QTcpSocket* remaining = nullptr;
+    if (socket == performer_) {
         performer_ = nullptr;
         remaining  = communicator_;
-    } else if (wsi == communicator_) {
+    } else if (socket == communicator_) {
         communicator_ = nullptr;
         remaining     = performer_;
     }
 
-    writeQueues_.erase(wsi);
+    readers_.erase(socket);
+    socket->deleteLater();
 
     if (remaining) {
         queueTo(remaining, MsgError::build("The other player disconnected"));
-        // Delayed stop — let run() loop flush the message naturally
         pendingStopCountdown_ = 20;
     } else {
         stop();
@@ -151,23 +114,37 @@ void GameRoom::onDisconnect(lws* wsi) {
     std::cout << "[Room " << roomCode_ << "] A player disconnected, shutting down\n";
 }
 
+// ── Message dispatch ─────────────────────────────────────────────────────────
+
+void GameRoom::onMessage(QTcpSocket* socket, const std::string& raw) {
+    std::string type;
+    try { type = getMsgType(raw); }
+    catch (...) { sendTo(socket, MsgError::build("Invalid JSON")); return; }
+
+    const json j = json::parse(raw);
+
+    if      (type == MsgType::IDENTIFY)    handleIdentify(socket, j);
+    else if (type == MsgType::GYRO_DATA)   handleGyroData(socket, j);
+    else if (type == MsgType::NOTE_SUBMIT) handleNoteSubmit(socket, j);
+    else    sendTo(socket, MsgError::build("Unknown message type in game: " + type));
+}
+
 // ── Game message handlers ────────────────────────────────────────────────────
 
-void GameRoom::handleIdentify(lws* wsi, const json& j) {
+void GameRoom::handleIdentify(QTcpSocket* socket, const json& j) {
     auto msg = MsgIdentify::parse(j);
 
     if (msg.role == Role::PERFORMER && !performer_) {
-        performer_ = wsi;
+        performer_ = socket;
         std::cout << "[Room " << roomCode_ << "] Performer identified\n";
     } else if (msg.role == Role::COMMUNICATOR && !communicator_) {
-        communicator_ = wsi;
+        communicator_ = socket;
         std::cout << "[Room " << roomCode_ << "] Communicator identified\n";
     } else {
-        sendTo(wsi, MsgError::build("Invalid or duplicate role: " + msg.role));
+        sendTo(socket, MsgError::build("Invalid or duplicate role: " + msg.role));
         return;
     }
 
-    // Start game once both players are identified
     if (bothPlayersConnected()) {
         gameStartTime_ = clock::now();
         if (gameType_ == "notepi") {
@@ -181,8 +158,8 @@ void GameRoom::handleIdentify(lws* wsi, const json& j) {
     }
 }
 
-void GameRoom::handleGyroData(lws* wsi, const json& j) {
-    if (wsi != performer_) return;  // ignore gyro from wrong client
+void GameRoom::handleGyroData(QTcpSocket* socket, const json& j) {
+    if (socket != performer_) return;
 
     auto msg = MsgGyroData::parse(j);
     std::lock_guard<std::mutex> lock(gyroMutex_);
@@ -190,13 +167,13 @@ void GameRoom::handleGyroData(lws* wsi, const json& j) {
     gyro_.roll  = msg.roll;
 }
 
-void GameRoom::handleNoteSubmit(lws* wsi, const json& j) {
-    if (wsi != performer_) return;
+void GameRoom::handleNoteSubmit(QTcpSocket* socket, const json& j) {
+    if (socket != performer_) return;
     if (!notePi_ || notePi_->isFinished()) return;
 
     auto msg = MsgNoteSubmit::parse(j);
     if ((int)msg.notes.size() != 5) {
-        sendTo(wsi, MsgError::build("Must submit exactly 5 notes"));
+        sendTo(socket, MsgError::build("Must submit exactly 5 notes"));
         return;
     }
 
@@ -222,8 +199,6 @@ void GameRoom::handleNoteSubmit(lws* wsi, const json& j) {
         if (performer_)    queueTo(performer_,    overMsg);
         if (communicator_) queueTo(communicator_, overMsg);
 
-        // Delayed stop — let run() loop flush the messages naturally
-        // (recursive lws_service from a callback corrupts lws state)
         pendingStopCountdown_ = 20;
     }
 }
@@ -232,26 +207,23 @@ void GameRoom::handleNoteSubmit(lws* wsi, const json& j) {
 
 void GameRoom::gameLoopThread() {
     using clock = std::chrono::steady_clock;
-    constexpr auto targetDt = std::chrono::milliseconds(25);  // ~40Hz
+    constexpr auto targetDt = std::chrono::milliseconds(25);
 
     auto lastTime = clock::now();
 
-    while (running_ && game_ && !game_->isFinished()) {
+    while (game_ && !game_->isFinished()) {
         auto now = clock::now();
         float dt = std::chrono::duration<float>(now - lastTime).count();
         lastTime = now;
 
-        // Read latest gyro input
         GyroInput gyro;
         {
             std::lock_guard<std::mutex> lock(gyroMutex_);
             gyro = gyro_;
         }
 
-        // Advance game physics
         game_->update(gyro.pitch, gyro.roll, dt);
 
-        // Package new state for broadcast
         GameState state = game_->getState();
         {
             std::lock_guard<std::mutex> lock(stateMutex_);
@@ -266,10 +238,9 @@ void GameRoom::gameLoopThread() {
         std::this_thread::sleep_until(lastTime + targetDt);
     }
 
-    // Game finished — send result
     if (game_) {
         std::lock_guard<std::mutex> lock(stateMutex_);
-        pendingState_.ballX = -1;  // sentinel: signals game over
+        pendingState_.ballX = -1;
     }
     stateDirty_ = true;
 }
@@ -283,7 +254,6 @@ void GameRoom::broadcastGameState() {
         state = pendingState_;
     }
 
-    // Check for game over sentinel
     if (state.ballX < 0) {
         int  elapsed = (int)std::chrono::duration<double>(
                            clock::now() - gameStartTime_).count();
@@ -312,16 +282,12 @@ bool GameRoom::bothPlayersConnected() const {
     return performer_ != nullptr && communicator_ != nullptr;
 }
 
-void GameRoom::sendTo(lws* wsi, const json& msg) {
-    auto& q = writeQueues_[wsi];
-    while (!q.empty()) q.pop();  // keep only latest state
-    q.push(msg.dump());
-    lws_callback_on_writable(wsi);
+void GameRoom::sendTo(QTcpSocket* socket, const json& msg) {
+    socket->write(frameMessage(msg.dump()));
 }
 
-void GameRoom::queueTo(lws* wsi, const json& msg) {
-    writeQueues_[wsi].push(msg.dump());
-    lws_callback_on_writable(wsi);
+void GameRoom::queueTo(QTcpSocket* socket, const json& msg) {
+    socket->write(frameMessage(msg.dump()));
 }
 
 std::string GameRoom::currentDate() const {

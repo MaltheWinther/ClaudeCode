@@ -2,60 +2,57 @@
 
 #include <string>
 #include <map>
-#include <queue>
-#include <libwebsockets.h>
+#include <QObject>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include "../common/Messages.hpp"
+#include "../common/TcpFraming.hpp"
 
-class LobbyServer {
+class LobbyServer : public QObject {
+    Q_OBJECT
 public:
-    explicit LobbyServer(int port);
-    ~LobbyServer();
+    explicit LobbyServer(int port, QObject* parent = nullptr);
 
-    void run();   // blocking — starts the lws event loop
     void stop();
 
-    // libwebsockets requires a static callback; it forwards to the instance
-    static int wsCallback(lws* wsi, lws_callback_reasons reason,
-                          void* user, void* in, size_t len);
+private slots:
+    void onNewConnection();
+    void onClientReadyRead();
+    void onClientDisconnected();
 
 private:
-    // ── Event handlers ───────────────────────────────────────────────────
-    void onConnect(lws* wsi);
-    void onMessage(lws* wsi, const std::string& raw);
-    void onDisconnect(lws* wsi);
-    void onWritable(lws* wsi);
+    // ── Message dispatch ──────────────────────────────────────────────────
+    void onMessage(QTcpSocket* socket, const std::string& raw);
 
-    // ── Lobby message handlers ───────────────────────────────────────────
-    void handleCreateRoom(lws* wsi, const json& j);
-    void handleJoinRoom(lws* wsi, const json& j);
-    void handleStartGame(lws* wsi, const json& j);
+    // ── Lobby message handlers ────────────────────────────────────────────
+    void handleCreateRoom(QTcpSocket* socket, const json& j);
+    void handleJoinRoom(QTcpSocket* socket, const json& j);
+    void handleStartGame(QTcpSocket* socket, const json& j);
 
-    // ── Helpers ──────────────────────────────────────────────────────────
-    void sendTo(lws* wsi, const json& msg);
+    // ── Helpers ───────────────────────────────────────────────────────────
+    void sendTo(QTcpSocket* socket, const json& msg);
     std::string generateRoomCode();
     int spawnGameRoom(const std::string& roomCode,
                       const std::string& hostName,
                       const std::string& guestName,
-                      const std::string& gameType);  // returns port
+                      const std::string& gameType);
 
-    // ── Room state ───────────────────────────────────────────────────────
+    // ── Room state ────────────────────────────────────────────────────────
     struct Room {
         std::string code;
         std::string hostName;
         std::string guestName;
-        lws* host  = nullptr;   // created the room
-        lws* guest = nullptr;   // joined the room
+        QTcpSocket* host  = nullptr;
+        QTcpSocket* guest = nullptr;
         enum class State { WAITING, FULL, PLAYING } state = State::WAITING;
     };
 
-    // ── Members ──────────────────────────────────────────────────────────
-    int           port_;
-    bool          running_ = false;
-    lws_context*  context_ = nullptr;
+    // ── Members ───────────────────────────────────────────────────────────
+    QTcpServer* tcpServer_ = nullptr;
 
-    std::map<std::string, Room>         rooms_;        // code  → Room
-    std::map<lws*, std::string>         clientRooms_;  // wsi   → room code
-    std::map<lws*, std::queue<std::string>> writeQueues_; // wsi → pending sends
+    std::map<std::string, Room>            rooms_;        // code   → Room
+    std::map<QTcpSocket*, std::string>     clientRooms_;  // socket → room code
+    std::map<QTcpSocket*, TcpFrameReader>  readers_;      // socket → frame reader
 
-    int nextGamePort_ = 9001;  // incremented each time a room spawns
+    int nextGamePort_ = 9001;
 };

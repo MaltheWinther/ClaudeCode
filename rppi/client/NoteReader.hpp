@@ -31,7 +31,7 @@ private:
     std::mutex cbMutex_;
 
     static constexpr float  MIN_CONFIDENCE = 0.6f;
-    static constexpr float  MIN_RMS = 0.005f;  // low threshold to allow phone speakers
+    static constexpr float  MIN_RMS = 0.008f;  // quiet room assumed — rejects more noise
 
     // Sustained-note detection: note must be held for SUSTAIN_MS before accepted
     std::string candidateNote_;
